@@ -1,0 +1,33 @@
+# Build artifacts
+dist/
+
+# Tool archives (keep tools themselves, not downloads)
+*.7z
+*.zip
+
+# ComfyUI (large, managed separately)
+ComfyUI/
+
+# Windows
+desktop.ini
+Thumbs.db
+*.lnk
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Temp
+*.tmp
+*.bak
