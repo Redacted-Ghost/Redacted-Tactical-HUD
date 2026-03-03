@@ -2,40 +2,32 @@
 
 ## Overview
 
-A minimal HUDFramework widget that proves the full pipeline:
-AS3 source → mxmlc compile → SWF → deploy to MO2 → Papyrus loader → in-game HUD.
+A minimal HUDFramework widget proving the full pipeline:
+AS3 source → SWF → Papyrus script → PEX → ESP → deploy to MO2 → in-game HUD.
 
 The widget draws a translucent black box with white text and responds to two commands:
-- **CMD_SET_TEXT (100)** — sets arbitrary text
-- **CMD_SET_COUNTER (101)** — displays an incrementing counter
+- **CMD_SET_TEXT (100)** — shows "LoreOut HUD: loaded" confirmation
+- **CMD_SET_COUNTER (101)** — displays an incrementing counter (arg1 = count)
 
 ## File Manifest
 
 | File | Purpose |
 |------|---------|
-| `src/as3/hudframework/IHUDWidget.as` | Compile-time interface (matches real HUDFramework API) |
+| `src/as3/hudframework/IHUDWidget.as` | Compile-time interface (verified via GhostHUD disassembly) |
 | `src/as3/loreout/widgets/LoreOutTestWidget.as` | Widget implementation |
 | `src/papyrus/LoreOutHUD_TestQuestScript.psc` | Papyrus quest script (registers widget, sends messages) |
 | `tools/build_widget.ps1` | Compiles AS3 → SWF via Adobe Flex SDK 4.6.0 |
-| `tools/deploy.ps1` | Copies dist/ artifacts to MO2 mod folder |
-| `dist/Interface/LoreOutTestWidget.swf` | Compiled output (1318 bytes, gitignored) |
+| `tools/build_papyrus.ps1` | Compiles .psc → .pex via CK PapyrusCompiler |
+| `tools/build_esp.py` | Generates LoreOutHUD.esp (Quest + VMAD script attachment) |
+| `tools/deploy.ps1` | Copies dist/ artifacts (ESP + SWF + PEX) to MO2 mod folder |
 
 ## Build
 
 ```powershell
-# From project root
-powershell -File tools/build_widget.ps1
-```
-
-Or manually:
-```bash
-java -jar "C:/dev/tools/flex-sdk/lib/mxmlc.jar" \
-  +flexlib="C:/dev/tools/flex-sdk/frameworks" \
-  -target-player=11.1 \
-  -static-link-runtime-shared-libraries=true \
-  "-source-path+=src/as3" \
-  "src/as3/loreout/widgets/LoreOutTestWidget.as" \
-  -output "dist/Interface/LoreOutTestWidget.swf"
+# Build all three artifacts
+powershell -File tools/build_widget.ps1      # AS3 → SWF
+powershell -File tools/build_papyrus.ps1     # .psc → .pex
+python tools/build_esp.py                     # Generate ESP
 ```
 
 ## Deploy
@@ -44,41 +36,52 @@ java -jar "C:/dev/tools/flex-sdk/lib/mxmlc.jar" \
 powershell -File tools/deploy.ps1
 ```
 
-Copies `dist/Interface/*.swf` → `C:/Modlists/WastelandReborn/mods/[nodelete] LoreOut Custom HUD/Interface/`
+Deploys to `C:/Modlists/WastelandReborn/mods/[nodelete] LoreOut Custom HUD/`:
+- `LoreOutHUD.esp` → mod root
+- `Interface/LoreOutTestWidget.swf`
+- `Scripts/LoreOutHUD_TestQuestScript.pex`
 
-## SWF Validation (FFDec)
+## HUDFramework API (Verified)
 
-Confirmed tags in compiled SWF:
-- `DoABC2` (tag 82) — bytecode present
-- `SymbolClass` (tag 76) — maps to `loreout.widgets.LoreOutTestWidget`
-- AS3 classes: `hudframework.IHUDWidget`, `loreout.widgets.LoreOutTestWidget`
+Decompiled HUDFramework.pex with Champollion to get the real API:
 
-## IHUDWidget Interface
+```papyrus
+; Registration
+Function RegisterWidget(ScriptObject akOwner, String asSWF, Float afX, Float afY, Bool abLoadNow, Bool abAutoLoad)
 
-Verified by disassembling GhostHUDWidget.swf (a working HUDFramework widget in the modlist):
+; Messaging (Float params only — no strings)
+Function SendMessage(String asWidgetID, Int aiCommand, Float arg1, Float arg2, Float arg3, Float arg4, Float arg5, Float arg6)
 
-```actionscript
-package hudframework {
-    public interface IHUDWidget {
-        function processMessage(command:String, params:Array):void;
-    }
-}
+; Static accessor
+HUDFramework Function GetInstance() Global
 ```
 
-- `command` is a String (the integer command ID as text)
-- `params` is an Array of values passed from Papyrus via `hud.SendMessage()`
+Key insight: `SendMessage` passes 6 Floats only. Text is hardcoded on the AS3 side.
+The widget's `processMessage(command:String, params:Array)` receives command as a String
+(the integer ID as text) and params as an Array of Float values.
 
-## Papyrus Script Notes
+## ESP Structure
 
-`LoreOutHUD_TestQuestScript.psc` is source-only for now. Compilation requires:
-1. The Papyrus compiler (from Creation Kit)
-2. HUDFramework.psc import files
+Generated programmatically (no Creation Kit needed):
+- **TES4 header**: FO4 format v1.34, master: Fallout4.esm
+- **QUST record** (FormID 0x00000D62):
+  - VMAD: script `LoreOutHUD_TestQuestScript` attached
+  - Flags: Start Game Enabled + Run Once
+  - Priority: 60
 
-The ESP (plugin) that attaches this script to a quest must be created in the Creation Kit.
+## Tools Installed
 
-## Remaining Steps (not in this PR)
+| Tool | Version | Path | Purpose |
+|------|---------|------|---------|
+| Champollion | 1.3.2 | `C:/dev/tools/champollion/` | PEX → PSC decompiler |
+| Caprica | 0.3.0 | `C:/dev/tools/caprica/` | Standalone Papyrus compiler (backup) |
 
-- [ ] Create ESP with a test quest that runs the Papyrus script
-- [ ] Compile .psc → .pex using the Papyrus compiler
-- [ ] In-game test: launch FO4 via MO2, verify widget appears at (30, 30) with counter
-- [ ] Iterate on widget layout/style once baseline is confirmed
+## In-Game Test Plan
+
+1. Enable `[nodelete] LoreOut Custom HUD` in MO2 (LoreOut profile)
+2. Ensure `LoreOutHUD.esp` appears in the load order after `HUDFramework.esm`
+3. Launch FO4 via MO2 → F4SE
+4. Expected: widget appears at screen position (30, 30)
+5. Shows "LoreOut HUD: waiting..." then "LoreOut HUD: loaded"
+6. Counter increments every second
+7. Check `Documents/My Games/Fallout4/Logs/Script/Papyrus.0.log` for `[LoreOutHUD]` traces

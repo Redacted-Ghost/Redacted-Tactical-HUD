@@ -1,6 +1,7 @@
 Scriptname LoreOutHUD_TestQuestScript extends Quest
 
 ; Command IDs — must match AS3 widget expectations
+; SendMessage signature: (String widgetID, Int command, Float arg1..arg6)
 Int Property CMD_SET_TEXT = 100 Auto Const
 Int Property CMD_SET_COUNTER = 101 Auto Const
 
@@ -18,7 +19,8 @@ Event OnInit()
     endif
 
     Debug.Trace("[LoreOutHUD] Registering widget: " + WIDGET_FILE)
-    hud.RegisterWidget(Self as Quest, WIDGET_FILE, 30.0, 30.0, True, True)
+    ; RegisterWidget(ScriptObject owner, String swf, Float x, Float y, Bool loadNow, Bool autoLoad)
+    hud.RegisterWidget(Self as ScriptObject, WIDGET_FILE, 30.0, 30.0, True, True)
 EndEvent
 
 Function HUD_WidgetLoaded(String asWidgetID)
@@ -28,9 +30,9 @@ Function HUD_WidgetLoaded(String asWidgetID)
 
     Debug.Trace("[LoreOutHUD] Widget loaded: " + asWidgetID)
 
-    ; Send initial confirmation message
-    Float[] params = new Float[0]
-    hud.SendMessage(WIDGET_FILE, CMD_SET_TEXT, "LoreOut HUD: loaded")
+    ; CMD_SET_TEXT (100): tells widget to show "loaded" state
+    ; SendMessage only passes Floats, so the AS3 side handles the text
+    hud.SendMessage(WIDGET_FILE, CMD_SET_TEXT, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
     ; Start counter test — fires every second
     StartTimer(1.0, 1)
@@ -42,7 +44,8 @@ Event OnTimer(Int aiTimerID)
     endif
 
     counter += 1
-    hud.SendMessage(WIDGET_FILE, CMD_SET_COUNTER, counter)
+    ; CMD_SET_COUNTER (101): arg1 = counter value
+    hud.SendMessage(WIDGET_FILE, CMD_SET_COUNTER, counter as Float, 0.0, 0.0, 0.0, 0.0, 0.0)
 
     ; Continue the loop
     StartTimer(1.0, 1)

@@ -39,9 +39,9 @@ package loreout.widgets {
             var cmd:int = parseInt(command);
 
             if (cmd == 100) {
-                if (params && params.length > 0) {
-                    tf.text = String(params[0]);
-                }
+                // SET_TEXT: HUDFramework SendMessage passes Floats only,
+                // so we hardcode the "loaded" confirmation text here
+                tf.text = "LoreOut HUD: loaded";
                 return;
             }
 

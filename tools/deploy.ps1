@@ -8,23 +8,30 @@ $ModDir  = "C:\Modlists\WastelandReborn\mods\[nodelete] LoreOut Custom HUD"
 
 # Ensure mod subdirectories exist
 $InterfaceDir = "$ModDir\Interface"
+$ScriptsDir   = "$ModDir\Scripts"
 $TexturesDir  = "$ModDir\Textures"
 
-if (-not (Test-Path $InterfaceDir)) {
-    New-Item -ItemType Directory -Path $InterfaceDir -Force | Out-Null
-    Write-Host "Created: $InterfaceDir" -ForegroundColor Yellow
+foreach ($dir in @($InterfaceDir, $ScriptsDir, $TexturesDir)) {
+    if (-not (Test-Path $dir)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        Write-Host "Created: $dir" -ForegroundColor Yellow
+    }
 }
 
-if (-not (Test-Path $TexturesDir)) {
-    New-Item -ItemType Directory -Path $TexturesDir -Force | Out-Null
-    Write-Host "Created: $TexturesDir" -ForegroundColor Yellow
-}
-
-# Deploy SWFs
 Write-Host "=== Deploying to MO2 mod folder ===" -ForegroundColor Cyan
 Write-Host "Target: $ModDir"
 Write-Host ""
 
+# Deploy ESP (plugin file goes in mod root)
+$espCount = 0
+$esps = Get-ChildItem "$DistDir\*.esp" -ErrorAction SilentlyContinue
+foreach ($esp in $esps) {
+    Copy-Item $esp.FullName -Destination $ModDir -Force
+    Write-Host "  Deployed: $($esp.Name)" -ForegroundColor Green
+    $espCount++
+}
+
+# Deploy SWFs
 $swfCount = 0
 if (Test-Path "$DistDir\Interface") {
     $swfs = Get-ChildItem "$DistDir\Interface\*.swf" -ErrorAction SilentlyContinue
@@ -32,6 +39,17 @@ if (Test-Path "$DistDir\Interface") {
         Copy-Item $swf.FullName -Destination $InterfaceDir -Force
         Write-Host "  Deployed: Interface\$($swf.Name)" -ForegroundColor Green
         $swfCount++
+    }
+}
+
+# Deploy PEX scripts
+$pexCount = 0
+if (Test-Path "$DistDir\Scripts") {
+    $pexes = Get-ChildItem "$DistDir\Scripts\*.pex" -ErrorAction SilentlyContinue
+    foreach ($pex in $pexes) {
+        Copy-Item $pex.FullName -Destination $ScriptsDir -Force
+        Write-Host "  Deployed: Scripts\$($pex.Name)" -ForegroundColor Green
+        $pexCount++
     }
 }
 
@@ -47,4 +65,4 @@ if (Test-Path "$DistDir\Textures") {
 }
 
 Write-Host ""
-Write-Host "DEPLOY COMPLETE: $swfCount SWF(s), $texCount texture(s)" -ForegroundColor Green
+Write-Host "DEPLOY COMPLETE: $espCount ESP(s), $swfCount SWF(s), $pexCount PEX(s), $texCount texture(s)" -ForegroundColor Green
