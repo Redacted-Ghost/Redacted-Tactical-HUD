@@ -1,13 +1,12 @@
 """
-build_esp.py — Generate LoreOutHUD.esp (minimal Fallout 4 plugin)
+build_esp.py — Generate LoreOutHUD.esp (Fallout 4 plugin)
 
-Creates a Quest record with the LoreOutHUD_TestQuestScript attached.
+Creates Quest records with Papyrus scripts attached.
 Structure modeled after GhostHUD's proven working ESP:
   - Master: HUDFramework.esm (establishes load order dependency)
-  - VMAD version 5 (matching GhostHUD; v6 may cause issues)
-  - FormID 0x01000001 (index 0x01 = this plugin's own record space)
-  - FULL subrecord (display name)
-  - NEXT subrecord (quest stages terminator)
+  - VMAD version 5 (matching GhostHUD)
+  - FormIDs 0x01xxxxxx (this plugin's own record space)
+  - FULL + NEXT subrecords (matching GhostHUD)
 """
 
 import struct
@@ -45,29 +44,69 @@ def make_top_grup(record_type_tag, records_bytes):
         + struct.pack('<iHHI', 0, 0, 0, 0)
     ) + records_bytes
 
-# --- Configuration ---
-# Modeled after GhostHUD's working ESP structure
+def make_quest(form_id, editor_id, display_name, script_name, priority=50):
+    """Build a complete QUST record matching GhostHUD format."""
+    form_version = 0x0083  # 131 decimal, standard FO4
 
-SCRIPT_NAME     = 'LoreOutHUD_TestQuestScript'
-QUEST_EDITOR_ID = 'LoreOutHUD_TestQuest'
-QUEST_FULL_NAME = 'LoreOut HUD Widget Controller'
+    edid = make_subrecord(b'EDID', (editor_id + '\x00').encode('ascii'))
 
-# FormID: high byte 0x01 = this plugin's own space (1 master = index 0x01 for own records)
-QUEST_FORM_ID   = 0x01000001
-FORM_VERSION    = 0x0083        # 131 decimal, standard FO4
+    # VMAD: script attachment (version=5, objFormat=2, matching GhostHUD)
+    vmad_body = struct.pack('<hhH', 5, 2, 1)  # version=5, objFormat=2, scriptCount=1
+    vmad_body += wstring(script_name)
+    vmad_body += struct.pack('<BH', 0, 0)       # status=0, propertyCount=0
+    vmad = make_subrecord(b'VMAD', vmad_body)
+
+    full = make_subrecord(b'FULL', (display_name + '\x00').encode('ascii'))
+
+    # DNAM: Start Game Enabled + Run Once, priority
+    dnam = make_subrecord(b'DNAM', struct.pack('<BBBBII',
+        0x01,       # flags1: Start Game Enabled
+        0x01,       # flags2: Run Once
+        priority,   # priority
+        0,          # pad
+        0,          # unknown
+        0           # questType: None
+    ))
+
+    next_sub = make_subrecord(b'NEXT', b'')  # stage terminator
+    anam = make_subrecord(b'ANAM', struct.pack('<I', 0))  # no aliases
+
+    return make_record(b'QUST', 0, form_id, form_version,
+        edid + vmad + full + dnam + next_sub + anam
+    )
+
+# --- Quest Definitions ---
+
+quests = [
+    {
+        'form_id':     0x01000001,
+        'editor_id':   'LoreOutHUD_TestQuest',
+        'display_name': 'LoreOut HUD Test Widget',
+        'script_name':  'LoreOutHUD_TestQuestScript',
+        'priority':     50,
+    },
+    {
+        'form_id':     0x01000002,
+        'editor_id':   'LoreOutCombat_Quest',
+        'display_name': 'LoreOut Combat Widget Controller',
+        'script_name':  'LoreOutCombat_QuestScript',
+        'priority':     50,
+    },
+]
 
 # --- TES4 (file header) ---
-# Match GhostHUD: HEDR version 1.00, master = HUDFramework.esm
+
+FORM_VERSION = 0x0083
+next_obj_id = max(q['form_id'] for q in quests) + 1  # 0x01000003
 
 hedr = make_subrecord(b'HEDR', struct.pack('<fII',
-    1.00,           # Plugin format version (GhostHUD uses 1.00)
-    1,              # numRecords (1 quest)
-    0x00000002      # nextObjectID (next available in our space: 0x01000002)
+    1.00,                           # Plugin format version (matching GhostHUD)
+    len(quests),                    # numRecords
+    next_obj_id & 0x00FFFFFF        # nextObjectID (strip index byte)
 ))
 cnam = make_subrecord(b'CNAM', b'LoreOut\x00')
 
-# Master: HUDFramework.esm (NOT Fallout4.esm — we don't reference Fallout4 forms)
-# This also ensures our ESP loads AFTER HUDFramework
+# Master: HUDFramework.esm (establishes load order + gives us index 0x01)
 mast1 = make_subrecord(b'MAST', b'HUDFramework.esm\x00')
 data1 = make_subrecord(b'DATA', struct.pack('<Q', 0))
 
@@ -75,47 +114,15 @@ tes4 = make_record(b'TES4', 0, 0, FORM_VERSION,
     hedr + cnam + mast1 + data1
 )
 
-# --- VMAD (Papyrus script attachment) ---
-# GhostHUD uses VMAD version 5, objFormat 2
+# --- Build all QUST records ---
 
-vmad_body = struct.pack('<hhH', 5, 2, 1)   # version=5, objFormat=2, scriptCount=1
-vmad_body += wstring(SCRIPT_NAME)
-vmad_body += struct.pack('<BH', 0, 0)       # status=0 (local), propertyCount=0
+qust_bytes = b''
+for q in quests:
+    qust_bytes += make_quest(**q)
 
-vmad = make_subrecord(b'VMAD', vmad_body)
+qust_grup = make_top_grup(b'QUST', qust_bytes)
 
-# --- QUST record ---
-
-edid = make_subrecord(b'EDID', (QUEST_EDITOR_ID + '\x00').encode('ascii'))
-
-# FULL: display name (GhostHUD has this, ours was missing)
-full = make_subrecord(b'FULL', (QUEST_FULL_NAME + '\x00').encode('ascii'))
-
-# DNAM: quest flags and metadata
-# Match GhostHUD: Start Game Enabled + Run Once, priority 50
-dnam = make_subrecord(b'DNAM', struct.pack('<BBBBII',
-    0x01,   # flags1: Start Game Enabled
-    0x01,   # flags2: Run Once (matching GhostHUD — lifecycle handles re-init via OnPlayerLoadGame)
-    50,     # priority (matching GhostHUD)
-    0,      # pad
-    0,      # unknown
-    0       # questType: None
-))
-
-# NEXT: quest stages terminator (GhostHUD has this, marks end of stage data)
-# Even with no stages, this empty marker may be required by the engine
-next_sub = make_subrecord(b'NEXT', b'')
-
-# ANAM: next alias ID (0 = no aliases)
-anam = make_subrecord(b'ANAM', struct.pack('<I', 0))
-
-qust = make_record(b'QUST', 0, QUEST_FORM_ID, FORM_VERSION,
-    edid + vmad + full + dnam + next_sub + anam
-)
-
-# --- Wrap in GRUP and write ---
-
-qust_grup = make_top_grup(b'QUST', qust)
+# --- Write ---
 
 out_dir = os.path.join(os.path.dirname(__file__), '..', 'dist')
 os.makedirs(out_dir, exist_ok=True)
@@ -127,3 +134,4 @@ with open(out_path, 'wb') as f:
 
 total = len(tes4) + len(qust_grup)
 print(f"BUILD SUCCESS: {os.path.abspath(out_path)} ({total} bytes)")
+print(f"  {len(quests)} quest(s): {', '.join(q['editor_id'] for q in quests)}")

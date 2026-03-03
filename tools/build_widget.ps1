@@ -1,44 +1,69 @@
-# build_widget.ps1 — Compile LoreOutTestWidget AS3 → SWF
+# build_widget.ps1 — Compile LoreOut AS3 widgets → SWF
 # Uses Adobe Flex SDK 4.6.0 (proven for Scaleform/FO4)
 
 $ErrorActionPreference = "Stop"
 
-$FlexSDK   = "C:\dev\tools\flex-sdk"
-$MxmlcJar  = "$FlexSDK\lib\mxmlc.jar"
-$Flexlib    = "$FlexSDK\frameworks"
-$SrcRoot   = "$PSScriptRoot\..\src\as3"
-$OutDir    = "$PSScriptRoot\..\dist\Interface"
-$OutFile   = "$OutDir\LoreOutTestWidget.swf"
-$MainClass = "$SrcRoot\loreout\widgets\LoreOutTestWidget.as"
+$FlexSDK  = "C:\dev\tools\flex-sdk"
+$MxmlcJar = "$FlexSDK\lib\mxmlc.jar"
+$Flexlib   = "$FlexSDK\frameworks"
+$SrcRoot  = (Resolve-Path "$PSScriptRoot\..\src\as3").Path
+$OutDir   = "$PSScriptRoot\..\dist\Interface"
 
-# Ensure output directory exists
 if (-not (Test-Path $OutDir)) {
     New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 }
+$OutDir = (Resolve-Path $OutDir).Path
 
-Write-Host "=== Building LoreOutTestWidget.swf ===" -ForegroundColor Cyan
-Write-Host "Source: $MainClass"
-Write-Host "Output: $OutFile"
-Write-Host ""
-
-$args = @(
-    "-jar", $MxmlcJar,
-    "+flexlib=$Flexlib",
-    "-target-player=11.1",
-    "-static-link-runtime-shared-libraries=true",
-    "-source-path+=$SrcRoot",
-    $MainClass,
-    "-output", $OutFile
+# Widget definitions: [MainClass, OutputSWF]
+$widgets = @(
+    @("loreout\widgets\LoreOutTestWidget.as", "LoreOutTestWidget.swf"),
+    @("loreout\widgets\LoreOutCombatWidget.as", "LoreOutCombatWidget.swf")
 )
 
-& java @args
+Write-Host "=== Building LoreOut Widgets ===" -ForegroundColor Cyan
+Write-Host "Source root: $SrcRoot"
+Write-Host "Output dir:  $OutDir"
+Write-Host ""
 
-if ($LASTEXITCODE -eq 0) {
-    $size = (Get-Item $OutFile).Length
-    Write-Host ""
-    Write-Host "BUILD SUCCESS: $OutFile ($size bytes)" -ForegroundColor Green
+$success = 0
+$fail = 0
+
+foreach ($widget in $widgets) {
+    $mainClass = Join-Path $SrcRoot $widget[0]
+    $outFile = Join-Path $OutDir $widget[1]
+
+    if (-not (Test-Path $mainClass)) {
+        Write-Host "SKIP: $($widget[0]) (not found)" -ForegroundColor Yellow
+        continue
+    }
+
+    Write-Host "Compiling: $($widget[1])" -ForegroundColor White
+    $javaArgs = @(
+        "-jar", $MxmlcJar,
+        "+flexlib=$Flexlib",
+        "-target-player=11.1",
+        "-static-link-runtime-shared-libraries=true",
+        "-source-path+=$SrcRoot",
+        $mainClass,
+        "-output", $outFile
+    )
+
+    & java @javaArgs 2>&1
+
+    if ($LASTEXITCODE -eq 0) {
+        $size = (Get-Item $outFile).Length
+        Write-Host "  OK: $($widget[1]) ($size bytes)" -ForegroundColor Green
+        $success++
+    } else {
+        Write-Host "  FAILED: $($widget[1])" -ForegroundColor Red
+        $fail++
+    }
+}
+
+Write-Host ""
+if ($fail -eq 0) {
+    Write-Host "BUILD SUCCESS: $success widget(s) compiled" -ForegroundColor Green
 } else {
-    Write-Host ""
-    Write-Host "BUILD FAILED (exit code $LASTEXITCODE)" -ForegroundColor Red
+    Write-Host "BUILD PARTIAL: $success succeeded, $fail failed" -ForegroundColor Yellow
     exit 1
 }
