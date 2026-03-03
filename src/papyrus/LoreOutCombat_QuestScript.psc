@@ -2,7 +2,8 @@ Scriptname LoreOutCombat_QuestScript extends Quest
 { LoreOut Combat Widget controller.
   Registers LoreOutCombatWidget.swf with HUDFramework and sends
   ammo/weapon/threat data via CMD_COMBAT_UPDATE (200).
-  Uses GhostHUD-grade lifecycle: delayed init, retry, OnPlayerLoadGame. }
+  Uses GhostHUD-grade lifecycle: delayed init, retry, OnPlayerLoadGame.
+  OnCombatStateChanged provides instant threat updates (no poll delay). }
 
 ; Log name — writes to Logs/Script/User/LoreOutCombat.0.log
 String LOG_NAME = "LoreOutCombat" Const
@@ -22,8 +23,8 @@ Int TIMER_UPDATE = 1 Const
 Float Property WIDGET_X = 1104.0 Auto Const
 Float Property WIDGET_Y = 616.0 Auto Const
 
-; Update interval (seconds)
-Float POLL_INTERVAL = 2.0 Const
+; Background poll interval (for ammo data that has no event)
+Float POLL_INTERVAL = 0.5 Const
 
 ; State
 HUDFramework hud
@@ -35,7 +36,9 @@ Bool bLoaded = false
 Event OnInit()
     Debug.OpenUserLog(LOG_NAME)
     Debug.TraceUser(LOG_NAME, "=== OnInit ===")
-    RegisterForRemoteEvent(Game.GetPlayer(), "OnPlayerLoadGame")
+    Actor player = Game.GetPlayer()
+    RegisterForRemoteEvent(player, "OnPlayerLoadGame")
+    RegisterForRemoteEvent(player, "OnCombatStateChanged")
     StartTimer(4.0, TIMER_REGISTER)
 EndEvent
 
@@ -44,7 +47,18 @@ Event Actor.OnPlayerLoadGame(Actor akSender)
     Debug.TraceUser(LOG_NAME, "=== OnPlayerLoadGame ===")
     bLoaded = false
     bRegistered = false
+    ; Re-register combat state event (may not survive save/load)
+    RegisterForRemoteEvent(Game.GetPlayer(), "OnCombatStateChanged")
     StartTimer(4.0, TIMER_REGISTER)
+EndEvent
+
+; Instant threat state update — fires immediately on combat state change
+; Remote event signature: adds akSender as first param (the registered Actor)
+Event Actor.OnCombatStateChanged(Actor akSender, Actor akTarget, int aeCombatState)
+    if bLoaded
+        Debug.TraceUser(LOG_NAME, "Combat state changed: " + aeCombatState)
+        SendCombatData()
+    endif
 EndEvent
 
 Event OnTimer(Int aiTimerID)
@@ -92,13 +106,12 @@ Function HUD_WidgetLoaded(String asWidgetID)
     ; Send initial data immediately
     SendCombatData()
 
-    ; Start polling loop
+    ; Start background poll for ammo/condition (no event available)
     StartTimer(POLL_INTERVAL, TIMER_UPDATE)
     Debug.TraceUser(LOG_NAME, "Update loop started (" + POLL_INTERVAL + "s)")
 EndFunction
 
-; === DATA POLLING ===
-; Reads real player weapon/ammo data from game state.
+; === DATA ===
 ; CMD_COMBAT_UPDATE (200): mag, reserve, fireMode, condPct, threat, reserved
 
 Function SendCombatData()
@@ -108,33 +121,22 @@ Function SendCombatData()
 
     Actor player = Game.GetPlayer()
 
-    ; Get equipped weapon ammo counts
-    ; GetValue on ammo returns current magazine, EquippedItemCount for total
-    Float mag = 0.0
-    Float reserve = 0.0
-    Float fireMode = 0.0    ; 0=SINGLE, 1=AUTO, 2=BURST (placeholder for now)
-    Float condPct = 100.0   ; weapon condition (placeholder — no vanilla API)
-    Float threat = 0.0      ; 0=CALM, 1=CAUTION, 2=COMBAT
+    ; Ammo data — placeholder until F4SE hooks
+    ; TODO: Use F4SE GetEquippedWeapon + ammo form lookups
+    Float mag = 30.0
+    Float reserve = 120.0
+    Float fireMode = 1.0    ; 0=SINGLE, 1=AUTO, 2=BURST
 
-    ; Real ammo data from the player's equipped weapon
-    ; Papyrus can read ammo via GetItemCount on the ammo type
-    ; For now: use placeholder values that look realistic
-    ; TODO: Hook into actual weapon data via F4SE or game properties
-    mag = 30.0
-    reserve = 120.0
-    fireMode = 1.0  ; AUTO
+    ; Weapon condition — placeholder (no vanilla Papyrus API)
+    Float condPct = 85.0
 
-    ; Threat state from player combat state
+    ; Threat state — REAL data from player combat state
+    Float threat = 0.0
     if player.IsInCombat()
         threat = 2.0
     elseif player.IsSneaking()
         threat = 1.0
-    else
-        threat = 0.0
     endif
-
-    ; Weapon condition placeholder (no vanilla Papyrus API for this)
-    condPct = 85.0
 
     hud.SendMessage(WIDGET_FILE, CMD_COMBAT_UPDATE, mag, reserve, fireMode, condPct, threat, 0.0)
 EndFunction
