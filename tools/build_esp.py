@@ -2,7 +2,12 @@
 build_esp.py — Generate LoreOutHUD.esp (minimal Fallout 4 plugin)
 
 Creates a Quest record with the LoreOutHUD_TestQuestScript attached.
-The quest is Start Game Enabled + Run Once, so OnInit fires on game load.
+Structure modeled after GhostHUD's proven working ESP:
+  - Master: HUDFramework.esm (establishes load order dependency)
+  - VMAD version 5 (matching GhostHUD; v6 may cause issues)
+  - FormID 0x01000001 (index 0x01 = this plugin's own record space)
+  - FULL subrecord (display name)
+  - NEXT subrecord (quest stages terminator)
 """
 
 import struct
@@ -41,23 +46,29 @@ def make_top_grup(record_type_tag, records_bytes):
     ) + records_bytes
 
 # --- Configuration ---
+# Modeled after GhostHUD's working ESP structure
 
-SCRIPT_NAME    = 'LoreOutHUD_TestQuestScript'
+SCRIPT_NAME     = 'LoreOutHUD_TestQuestScript'
 QUEST_EDITOR_ID = 'LoreOutHUD_TestQuest'
-QUEST_FORM_ID  = 0x00000D63    # bumped: old 0x0D62 is "spent" on existing saves
-FORM_VERSION   = 0x0083        # 131 decimal, standard FO4
+QUEST_FULL_NAME = 'LoreOut HUD Widget Controller'
+
+# FormID: high byte 0x01 = this plugin's own space (1 master = index 0x01 for own records)
+QUEST_FORM_ID   = 0x01000001
+FORM_VERSION    = 0x0083        # 131 decimal, standard FO4
 
 # --- TES4 (file header) ---
+# Match GhostHUD: HEDR version 1.00, master = HUDFramework.esm
 
 hedr = make_subrecord(b'HEDR', struct.pack('<fII',
-    1.34,           # FO4 plugin format version
+    1.00,           # Plugin format version (GhostHUD uses 1.00)
     1,              # numRecords (1 quest)
-    0x00000D64      # nextObjectID
+    0x00000002      # nextObjectID (next available in our space: 0x01000002)
 ))
 cnam = make_subrecord(b'CNAM', b'LoreOut\x00')
 
-# Master: Fallout4.esm (required base)
-mast1 = make_subrecord(b'MAST', b'Fallout4.esm\x00')
+# Master: HUDFramework.esm (NOT Fallout4.esm — we don't reference Fallout4 forms)
+# This also ensures our ESP loads AFTER HUDFramework
+mast1 = make_subrecord(b'MAST', b'HUDFramework.esm\x00')
 data1 = make_subrecord(b'DATA', struct.pack('<Q', 0))
 
 tes4 = make_record(b'TES4', 0, 0, FORM_VERSION,
@@ -65,8 +76,9 @@ tes4 = make_record(b'TES4', 0, 0, FORM_VERSION,
 )
 
 # --- VMAD (Papyrus script attachment) ---
+# GhostHUD uses VMAD version 5, objFormat 2
 
-vmad_body = struct.pack('<hhH', 6, 2, 1)   # version=6, objFormat=2, scriptCount=1
+vmad_body = struct.pack('<hhH', 5, 2, 1)   # version=5, objFormat=2, scriptCount=1
 vmad_body += wstring(SCRIPT_NAME)
 vmad_body += struct.pack('<BH', 0, 0)       # status=0 (local), propertyCount=0
 
@@ -76,25 +88,29 @@ vmad = make_subrecord(b'VMAD', vmad_body)
 
 edid = make_subrecord(b'EDID', (QUEST_EDITOR_ID + '\x00').encode('ascii'))
 
+# FULL: display name (GhostHUD has this, ours was missing)
+full = make_subrecord(b'FULL', (QUEST_FULL_NAME + '\x00').encode('ascii'))
+
 # DNAM: quest flags and metadata
-# flags1: 0x01 = Start Game Enabled
-# flags2: 0x00 = NOT Run Once (removed — lifecycle handles re-init via OnPlayerLoadGame)
-# priority: 60
-# questType: 0 = None
+# Match GhostHUD: Start Game Enabled + Run Once, priority 50
 dnam = make_subrecord(b'DNAM', struct.pack('<BBBBII',
     0x01,   # flags1: Start Game Enabled
-    0x00,   # flags2: no Run Once — quest persists, script handles lifecycle
-    60,     # priority
+    0x01,   # flags2: Run Once (matching GhostHUD — lifecycle handles re-init via OnPlayerLoadGame)
+    50,     # priority (matching GhostHUD)
     0,      # pad
     0,      # unknown
     0       # questType: None
 ))
 
+# NEXT: quest stages terminator (GhostHUD has this, marks end of stage data)
+# Even with no stages, this empty marker may be required by the engine
+next_sub = make_subrecord(b'NEXT', b'')
+
 # ANAM: next alias ID (0 = no aliases)
 anam = make_subrecord(b'ANAM', struct.pack('<I', 0))
 
 qust = make_record(b'QUST', 0, QUEST_FORM_ID, FORM_VERSION,
-    edid + vmad + dnam + anam
+    edid + vmad + full + dnam + next_sub + anam
 )
 
 # --- Wrap in GRUP and write ---
