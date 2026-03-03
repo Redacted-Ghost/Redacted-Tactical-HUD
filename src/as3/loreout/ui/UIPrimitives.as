@@ -207,6 +207,45 @@ package loreout.ui {
         }
 
         // ================================================================
+        // EYE ICON: stealth/awareness indicator (bezier curves)
+        // ================================================================
+        public static function drawEyeIcon(parent:DisplayObjectContainer,
+                                            cx:Number, cy:Number,
+                                            size:Number,
+                                            color:uint,
+                                            alpha:Number = 0.9):Shape {
+            var s:Shape = new Shape();
+            var g:* = s.graphics;
+            var hw:Number = size * 0.5;    // half width
+            var hh:Number = size * 0.28;   // half height (eye is ~1.8:1 aspect)
+
+            // Outer eye shape — two quadratic bezier curves
+            g.lineStyle(LINE_HAIR, color, alpha);
+
+            // Top lid
+            g.moveTo(cx - hw, cy);
+            g.curveTo(cx, cy - hh * 2.2, cx + hw, cy);
+
+            // Bottom lid
+            g.moveTo(cx - hw, cy);
+            g.curveTo(cx, cy + hh * 2.2, cx + hw, cy);
+
+            // Iris (filled circle)
+            g.lineStyle(0);
+            g.beginFill(color, alpha * 0.65);
+            g.drawCircle(cx, cy, hh * 0.85);
+            g.endFill();
+
+            // Pupil (dark center)
+            g.beginFill(COL_BG, 0.95);
+            g.drawCircle(cx, cy, hh * 0.35);
+            g.endFill();
+
+            parent.addChild(s);
+            return s;
+        }
+
+        // ================================================================
         // STATE GLOW: apply glow filter based on state
         // ================================================================
         public static function applyState(target:*, state:int):void {

@@ -92,6 +92,13 @@ quests = [
         'script_name':  'LoreOutCombat_QuestScript',
         'priority':     50,
     },
+    {
+        'form_id':     0x01000003,
+        'editor_id':   'LoreOutStatus_Quest',
+        'display_name': 'LoreOut Status Widget Controller',
+        'script_name':  'LoreOutStatus_QuestScript',
+        'priority':     50,
+    },
 ]
 
 # --- TES4 (file header) ---

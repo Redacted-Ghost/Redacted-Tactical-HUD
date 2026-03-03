@@ -32,12 +32,16 @@ $scripts = Get-ChildItem "$SrcDir\*.psc" -ErrorAction SilentlyContinue
 $success = 0
 $fail = 0
 
+# IMPORTANT: PapyrusCompiler derives script name from relative path.
+# We must cd to SrcDir and pass just the filename, not the full path.
+$savedLocation = Get-Location
+Set-Location $SrcDir
+
 foreach ($script in $scripts) {
     Write-Host "Compiling: $($script.Name)" -ForegroundColor White
 
-    # Pass the full path with SrcDir in imports so the compiler resolves correctly
-    $importPath = "$SrcDir;$BaseImport;$HFImport"
-    $result = & $Compiler "$($script.FullName)" "-i=$importPath" "-o=$OutDir" "-f=$FlagsFile" 2>&1
+    $importPath = ".;$BaseImport;$HFImport"
+    $result = & $Compiler "$($script.Name)" "-i=$importPath" "-o=$OutDir" "-f=$FlagsFile" 2>&1
     $result | ForEach-Object { Write-Host "  $_" }
 
     if ($LASTEXITCODE -eq 0) {
@@ -53,6 +57,8 @@ foreach ($script in $scripts) {
         $fail++
     }
 }
+
+Set-Location $savedLocation
 
 Write-Host ""
 if ($fail -eq 0) {
