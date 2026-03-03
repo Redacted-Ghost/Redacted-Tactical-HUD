@@ -44,7 +44,7 @@ def make_top_grup(record_type_tag, records_bytes):
 
 SCRIPT_NAME    = 'LoreOutHUD_TestQuestScript'
 QUEST_EDITOR_ID = 'LoreOutHUD_TestQuest'
-QUEST_FORM_ID  = 0x00000D62    # object ID 0x0D62, index byte 0x00
+QUEST_FORM_ID  = 0x00000D63    # bumped: old 0x0D62 is "spent" on existing saves
 FORM_VERSION   = 0x0083        # 131 decimal, standard FO4
 
 # --- TES4 (file header) ---
@@ -52,7 +52,7 @@ FORM_VERSION   = 0x0083        # 131 decimal, standard FO4
 hedr = make_subrecord(b'HEDR', struct.pack('<fII',
     1.34,           # FO4 plugin format version
     1,              # numRecords (1 quest)
-    0x00000D63      # nextObjectID
+    0x00000D64      # nextObjectID
 ))
 cnam = make_subrecord(b'CNAM', b'LoreOut\x00')
 
@@ -78,12 +78,12 @@ edid = make_subrecord(b'EDID', (QUEST_EDITOR_ID + '\x00').encode('ascii'))
 
 # DNAM: quest flags and metadata
 # flags1: 0x01 = Start Game Enabled
-# flags2: 0x01 = Run Once
+# flags2: 0x00 = NOT Run Once (removed — lifecycle handles re-init via OnPlayerLoadGame)
 # priority: 60
 # questType: 0 = None
 dnam = make_subrecord(b'DNAM', struct.pack('<BBBBII',
     0x01,   # flags1: Start Game Enabled
-    0x01,   # flags2: Run Once
+    0x00,   # flags2: no Run Once — quest persists, script handles lifecycle
     60,     # priority
     0,      # pad
     0,      # unknown

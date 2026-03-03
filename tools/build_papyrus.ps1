@@ -1,14 +1,21 @@
 # build_papyrus.ps1 — Compile Papyrus .psc → .pex
 # Uses the Creation Kit PapyrusCompiler with FO4 base scripts + HUDFramework imports
+#
+# NOTE: PapyrusCompiler resolves script paths relative to the IMPORT directories.
+# We must pass the script filename (not full path) and include SrcDir in -i= imports,
+# OR cd to SrcDir first. We use Push-Location approach for reliability.
 
 $ErrorActionPreference = "Stop"
 
 $Compiler   = "C:\steam games\steam\steamapps\common\Fallout 4\Papyrus Compiler\PapyrusCompiler.exe"
 $FlagsFile  = "C:\steam games\steam\steamapps\common\Fallout 4\Data\Scripts\Source\Institute_Papyrus_Flags.flg"
 $BaseImport = "C:\steam games\steam\steamapps\common\Fallout 4\Data\Scripts\Source"
-$HFImport   = "$PSScriptRoot\..\tmp\hf_pex"
-$SrcDir     = "$PSScriptRoot\..\src\papyrus"
-$OutDir     = "$PSScriptRoot\..\dist\Scripts"
+
+# Resolve relative paths to absolute
+$ProjectRoot = (Resolve-Path "$PSScriptRoot\..").Path
+$HFImport    = Join-Path $ProjectRoot "tmp\hf_pex"
+$SrcDir      = Join-Path $ProjectRoot "src\papyrus"
+$OutDir      = Join-Path $ProjectRoot "dist\Scripts"
 
 if (-not (Test-Path $OutDir)) {
     New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
@@ -16,6 +23,8 @@ if (-not (Test-Path $OutDir)) {
 
 Write-Host "=== Building Papyrus Scripts ===" -ForegroundColor Cyan
 Write-Host "Compiler: $Compiler"
+Write-Host "Source:   $SrcDir"
+Write-Host "Imports:  $SrcDir;$BaseImport;$HFImport"
 Write-Host "Output:   $OutDir"
 Write-Host ""
 
@@ -25,7 +34,11 @@ $fail = 0
 
 foreach ($script in $scripts) {
     Write-Host "Compiling: $($script.Name)" -ForegroundColor White
-    & $Compiler $script.FullName "-i=$BaseImport;$HFImport" "-o=$OutDir" "-f=$FlagsFile" 2>&1
+
+    # Pass the full path with SrcDir in imports so the compiler resolves correctly
+    $importPath = "$SrcDir;$BaseImport;$HFImport"
+    $result = & $Compiler "$($script.FullName)" "-i=$importPath" "-o=$OutDir" "-f=$FlagsFile" 2>&1
+    $result | ForEach-Object { Write-Host "  $_" }
 
     if ($LASTEXITCODE -eq 0) {
         $pexName = [System.IO.Path]::ChangeExtension($script.Name, ".pex")
