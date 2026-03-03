@@ -99,6 +99,13 @@ quests = [
         'script_name':  'LoreOutStatus_QuestScript',
         'priority':     50,
     },
+    {
+        'form_id':     0x01000004,
+        'editor_id':   'LoreOut_LighthouseProbe',
+        'display_name': 'LoreOut Lighthouse API Probe',
+        'script_name':  'LighthouseProbe',
+        'priority':     50,
+    },
 ]
 
 # --- TES4 (file header) ---

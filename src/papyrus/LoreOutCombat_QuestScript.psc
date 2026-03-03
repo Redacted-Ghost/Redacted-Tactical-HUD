@@ -1,14 +1,19 @@
 Scriptname LoreOutCombat_QuestScript extends Quest
 { LoreOut Combat Widget controller.
   Registers LoreOutCombatWidget.swf with HUDFramework and sends
-  ammo/weapon/threat data via CMD_COMBAT_UPDATE (200).
+  LIVE ammo/weapon/threat data via Lighthouse Papyrus Extender.
+
+  CMD 200 (float): magCur, magCap, reserve, spareMags, threat, hostiles
+  CMD 201 (string): weapon name
+  CMD 202 (string): ammo type name
+
   Uses GhostHUD-grade lifecycle: delayed init, retry, OnPlayerLoadGame.
   OnCombatStateChanged provides instant threat updates (no poll delay). }
 
 ; Log name — writes to Logs/Script/User/LoreOutCombat.0.log
 String LOG_NAME = "LoreOutCombat" Const
 
-; Command ID — matches AS3 CMD_COMBAT_UPDATE
+; Command IDs — match AS3 constants
 Int Property CMD_COMBAT_UPDATE = 200 Auto Const
 
 ; Widget SWF filename (in Interface/)
@@ -30,6 +35,7 @@ Float POLL_INTERVAL = 0.5 Const
 HUDFramework hud
 Bool bRegistered = false
 Bool bLoaded = false
+String sLastWeaponName = ""
 
 ; === LIFECYCLE ===
 
@@ -47,13 +53,12 @@ Event Actor.OnPlayerLoadGame(Actor akSender)
     Debug.TraceUser(LOG_NAME, "=== OnPlayerLoadGame ===")
     bLoaded = false
     bRegistered = false
-    ; Re-register combat state event (may not survive save/load)
+    sLastWeaponName = ""
     RegisterForRemoteEvent(Game.GetPlayer(), "OnCombatStateChanged")
     StartTimer(4.0, TIMER_REGISTER)
 EndEvent
 
 ; Instant threat state update — fires immediately on combat state change
-; Remote event signature: adds akSender as first param (the registered Actor)
 Event Actor.OnCombatStateChanged(Actor akSender, Actor akTarget, int aeCombatState)
     if bLoaded
         Debug.TraceUser(LOG_NAME, "Combat state changed: " + aeCombatState)
@@ -101,18 +106,18 @@ Function HUD_WidgetLoaded(String asWidgetID)
 
     bLoaded = true
     Debug.TraceUser(LOG_NAME, "Widget loaded: " + asWidgetID)
-    Debug.Notification("[LoreOut] Combat widget loaded!")
 
     ; Send initial data immediately
     SendCombatData()
 
-    ; Start background poll for ammo/condition (no event available)
+    ; Start background poll for ammo data (no event for ammo changes)
     StartTimer(POLL_INTERVAL, TIMER_UPDATE)
     Debug.TraceUser(LOG_NAME, "Update loop started (" + POLL_INTERVAL + "s)")
 EndFunction
 
 ; === DATA ===
-; CMD_COMBAT_UPDATE (200): mag, reserve, fireMode, condPct, threat, reserved
+; All numeric data via Lighthouse Papyrus Extender (validated by probe)
+; String data (weapon/ammo names) via SendMessageString
 
 Function SendCombatData()
     if !hud || !bLoaded
@@ -121,22 +126,58 @@ Function SendCombatData()
 
     Actor player = Game.GetPlayer()
 
-    ; Ammo data — placeholder until F4SE hooks
-    ; TODO: Use F4SE GetEquippedWeapon + ammo form lookups
-    Float mag = 30.0
-    Float reserve = 120.0
-    Float fireMode = 1.0    ; 0=SINGLE, 1=AUTO, 2=BURST
+    ; === Magazine data (Lighthouse — validated: tracks live!) ===
+    float magCur = Lighthouse.GetWeaponAmmoCount(player)
+    float magCap = Lighthouse.GetWeaponAmmoCapacity(player)
 
-    ; Weapon condition — placeholder (no vanilla Papyrus API)
-    Float condPct = 85.0
+    ; === Reserve ammo (inventory count) ===
+    float reserve = 0.0
+    Ammo ammoType = Lighthouse.GetWeaponAmmoType(player)
+    if ammoType
+        reserve = player.GetItemCount(ammoType as Form)
+    endif
 
-    ; Threat state — REAL data from player combat state
-    Float threat = 0.0
+    ; === Spare magazines (Lighthouse) ===
+    float spareMags = Lighthouse.GetWeaponMagCount(player, true)
+
+    ; === Threat state (vanilla + Lighthouse) ===
+    float threat = 0.0
     if player.IsInCombat()
         threat = 2.0
     elseif player.IsSneaking()
         threat = 1.0
     endif
 
-    hud.SendMessage(WIDGET_FILE, CMD_COMBAT_UPDATE, mag, reserve, fireMode, condPct, threat, 0.0)
+    ; === Hostile count (Lighthouse — lightweight bool check first) ===
+    float hostileCount = 0.0
+    if Lighthouse.AreHostileActorsInRange(player, 3000)
+        Actor[] hostiles = Lighthouse.GetActorsHostileToActor(player, 3000, false)
+        if hostiles
+            hostileCount = hostiles.Length
+        endif
+    endif
+
+    ; Send numeric data (6 floats via CMD 200)
+    hud.SendMessage(WIDGET_FILE, CMD_COMBAT_UPDATE, magCur, magCap, reserve, spareMags, threat, hostileCount)
+
+    ; === Weapon name (string — only send when weapon changes) ===
+    String weapName = ""
+    Weapon equippedWeapon = player.GetEquippedWeapon(0)
+    if equippedWeapon
+        weapName = equippedWeapon.GetName()
+    endif
+
+    if weapName != sLastWeaponName
+        sLastWeaponName = weapName
+        hud.SendMessageString(WIDGET_FILE, "201", weapName, false, false)
+
+        ; Also send ammo type when weapon changes
+        if ammoType
+            hud.SendMessageString(WIDGET_FILE, "202", ammoType.GetName(), false, false)
+        else
+            hud.SendMessageString(WIDGET_FILE, "202", "", false, false)
+        endif
+
+        Debug.TraceUser(LOG_NAME, "Weapon changed: " + weapName)
+    endif
 EndFunction

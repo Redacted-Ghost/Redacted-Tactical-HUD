@@ -17,6 +17,10 @@ $HFImport    = Join-Path $ProjectRoot "tmp\hf_pex"
 $SrcDir      = Join-Path $ProjectRoot "src\papyrus"
 $OutDir      = Join-Path $ProjectRoot "dist\Scripts"
 
+# Mod API imports (Lighthouse, F4SE, etc.)
+$LighthouseImport = "C:\Modlists\WastelandReborn\mods\Lighthouse Papyrus Extender\Scripts\Source"
+$F4SEImport       = "C:\Modlists\WastelandReborn\mods\Fallout 4 Script Extender (F4SE)\Scripts\Source"
+
 if (-not (Test-Path $OutDir)) {
     New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 }
@@ -24,7 +28,7 @@ if (-not (Test-Path $OutDir)) {
 Write-Host "=== Building Papyrus Scripts ===" -ForegroundColor Cyan
 Write-Host "Compiler: $Compiler"
 Write-Host "Source:   $SrcDir"
-Write-Host "Imports:  $SrcDir;$BaseImport;$HFImport"
+Write-Host "Imports:  $SrcDir;$BaseImport;$HFImport;$LighthouseImport;$F4SEImport"
 Write-Host "Output:   $OutDir"
 Write-Host ""
 
@@ -40,7 +44,8 @@ Set-Location $SrcDir
 foreach ($script in $scripts) {
     Write-Host "Compiling: $($script.Name)" -ForegroundColor White
 
-    $importPath = ".;$BaseImport;$HFImport"
+    # F4SE imports BEFORE base game so extended Actor.psc/InstanceData.psc take priority
+    $importPath = ".;$F4SEImport;$BaseImport;$HFImport;$LighthouseImport"
     $result = & $Compiler "$($script.Name)" "-i=$importPath" "-o=$OutDir" "-f=$FlagsFile" 2>&1
     $result | ForEach-Object { Write-Host "  $_" }
 
