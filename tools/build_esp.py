@@ -79,31 +79,40 @@ def make_quest(form_id, editor_id, display_name, script_name, priority=50):
 
 quests = [
     {
-        'form_id':     0x01000001,
-        'editor_id':   'LoreOutHUD_TestQuest',
-        'display_name': 'LoreOut HUD Test Widget',
-        'script_name':  'LoreOutHUD_TestQuestScript',
-        'priority':     50,
-    },
-    {
         'form_id':     0x01000002,
         'editor_id':   'LoreOutCombat_Quest',
-        'display_name': 'LoreOut Combat Widget Controller',
+        'display_name': 'Redacted Tactical HUD - Combat',
         'script_name':  'LoreOutCombat_QuestScript',
         'priority':     50,
     },
     {
         'form_id':     0x01000003,
         'editor_id':   'LoreOutStatus_Quest',
-        'display_name': 'LoreOut Status Widget Controller',
+        'display_name': 'Redacted Tactical HUD - Status',
         'script_name':  'LoreOutStatus_QuestScript',
         'priority':     50,
     },
     {
-        'form_id':     0x01000004,
-        'editor_id':   'LoreOut_LighthouseProbe',
-        'display_name': 'LoreOut Lighthouse API Probe',
-        'script_name':  'LighthouseProbe',
+        'form_id':     0x01000005,
+        'editor_id':   'LoreOutHeartbeat_Quest',
+        'display_name': 'Redacted Tactical HUD - Heartbeat',
+        'script_name':  'LoreOutHeartbeat_QuestScript',
+        'priority':     50,
+    },
+    # Compass quest REMOVED — using native FallUI/vanilla compass instead
+    # (engine-driven per-frame heading, zero Papyrus latency)
+    {
+        'form_id':     0x01000007,
+        'editor_id':   'LoreOutRads_Quest',
+        'display_name': 'Redacted Tactical HUD - Rads',
+        'script_name':  'LoreOutRads_QuestScript',
+        'priority':     50,
+    },
+    {
+        'form_id':     0x01000008,
+        'editor_id':   'LoreOutAP_Quest',
+        'display_name': 'Redacted Tactical HUD - AP',
+        'script_name':  'LoreOutAP_QuestScript',
         'priority':     50,
     },
 ]

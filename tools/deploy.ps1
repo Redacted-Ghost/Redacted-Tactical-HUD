@@ -7,11 +7,13 @@ $DistDir = "$PSScriptRoot\..\dist"
 $ModDir  = "C:\Modlists\WastelandReborn\mods\[nodelete] LoreOut Custom HUD"
 
 # Ensure mod subdirectories exist
-$InterfaceDir = "$ModDir\Interface"
-$ScriptsDir   = "$ModDir\Scripts"
-$TexturesDir  = "$ModDir\Textures"
+$InterfaceDir     = "$ModDir\Interface"
+$ScriptsDir       = "$ModDir\Scripts"
+$TexturesDir      = "$ModDir\Textures"
+$FallUILayoutDir  = "$ModDir\Interface\FallUI HUD\Importable HUD Layouts"
+$MCMPresetDir     = "$ModDir\MCM\Settings\Presets"
 
-foreach ($dir in @($InterfaceDir, $ScriptsDir, $TexturesDir)) {
+foreach ($dir in @($InterfaceDir, $ScriptsDir, $TexturesDir, $FallUILayoutDir, $MCMPresetDir)) {
     if (-not (Test-Path $dir)) {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         Write-Host "Created: $dir" -ForegroundColor Yellow
@@ -64,5 +66,48 @@ if (Test-Path "$DistDir\Textures") {
     }
 }
 
+# Deploy FallUI HUD layout presets
+$layoutCount = 0
+$layoutSrc = "$DistDir\Interface\FallUI HUD\Importable HUD Layouts"
+if (Test-Path $layoutSrc) {
+    $layouts = Get-ChildItem "$layoutSrc\*.ini" -ErrorAction SilentlyContinue
+    foreach ($layout in $layouts) {
+        Copy-Item $layout.FullName -Destination $FallUILayoutDir -Force
+        Write-Host "  Deployed: Interface\FallUI HUD\Importable HUD Layouts\$($layout.Name)" -ForegroundColor Green
+        $layoutCount++
+    }
+}
+
+# Deploy MCM presets
+$mcmCount = 0
+$mcmSrc = "$DistDir\MCM\Settings\Presets"
+if (Test-Path $mcmSrc) {
+    $presets = Get-ChildItem "$mcmSrc\*.ini" -ErrorAction SilentlyContinue
+    foreach ($preset in $presets) {
+        Copy-Item $preset.FullName -Destination $MCMPresetDir -Force
+        Write-Host "  Deployed: MCM\Settings\Presets\$($preset.Name)" -ForegroundColor Green
+        $mcmCount++
+    }
+}
+
+# Deploy MCM configs (e.g. GhostHUD MCM menu)
+$mcmConfigCount = 0
+$mcmConfigSrc = "$DistDir\MCM\Config"
+if (Test-Path $mcmConfigSrc) {
+    $configDirs = Get-ChildItem $mcmConfigSrc -Directory -ErrorAction SilentlyContinue
+    foreach ($configDir in $configDirs) {
+        $destDir = "$ModDir\MCM\Config\$($configDir.Name)"
+        if (-not (Test-Path $destDir)) {
+            New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+        }
+        $configFiles = Get-ChildItem $configDir.FullName -File -ErrorAction SilentlyContinue
+        foreach ($cf in $configFiles) {
+            Copy-Item $cf.FullName -Destination $destDir -Force
+            Write-Host "  Deployed: MCM\Config\$($configDir.Name)\$($cf.Name)" -ForegroundColor Green
+            $mcmConfigCount++
+        }
+    }
+}
+
 Write-Host ""
-Write-Host "DEPLOY COMPLETE: $espCount ESP(s), $swfCount SWF(s), $pexCount PEX(s), $texCount texture(s)" -ForegroundColor Green
+Write-Host "DEPLOY COMPLETE: $espCount ESP(s), $swfCount SWF(s), $pexCount PEX(s), $texCount texture(s), $layoutCount layout(s), $mcmCount MCM preset(s), $mcmConfigCount MCM config(s)" -ForegroundColor Green

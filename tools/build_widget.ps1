@@ -16,9 +16,12 @@ $OutDir = (Resolve-Path $OutDir).Path
 
 # Widget definitions: [MainClass, OutputSWF]
 $widgets = @(
-    @("loreout\widgets\LoreOutTestWidget.as", "LoreOutTestWidget.swf"),
     @("loreout\widgets\LoreOutCombatWidget.as", "LoreOutCombatWidget.swf"),
-    @("loreout\widgets\LoreOutStatusWidget.as", "LoreOutStatusWidget.swf")
+    @("loreout\widgets\LoreOutStatusWidget.as", "LoreOutStatusWidget.swf"),
+    @("loreout\widgets\LoreOutHeartbeatWidget.as", "LoreOutHeartbeatWidget.swf"),
+    @("loreout\widgets\LoreOutCompassWidget.as", "LoreOutCompassWidget.swf"),
+    @("loreout\widgets\LoreOutRadsWidget.as", "LoreOutRadsWidget.swf"),
+    @("loreout\widgets\LoreOutAPWidget.as", "LoreOutAPWidget.swf")
 )
 
 Write-Host "=== Building LoreOut Widgets ===" -ForegroundColor Cyan
