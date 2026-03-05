@@ -11,12 +11,17 @@ package loreout.widgets {
     import loreout.ui.UIPrimitives;
 
     /**
-     * LoreOut Rads Widget v11 — Tactical panel radiation module.
+     * LoreOut Rads Widget v12 — Concentric Ring Scanner.
      *
-     * 192x96 chamfered tactical panel with teal accent,
-     * centered 270-degree ring gauge, header band inside,
-     * Geiger needle, static noise, DNA helix.
-     * Panel outline shifts: teal(low) → amber(mid) → red(high).
+     * 160x160 square ring-centric design:
+     *   - Outer tick ring (R=65, 36 ticks, major every 9th)
+     *   - Data arc ring (R=56, 6px, 270deg sweep)
+     *   - Rotating inner detail ring (R=46, 6 segmented arcs)
+     *   - Innermost dotted ring (R=38, static)
+     *   - Center readout + needle + Geiger jitter
+     *   - Trefoil icon + rate indicator
+     *
+     * White/grey monochrome, red at >=75%.
      *
      * CMD 400 (floats): rads, maxRads, isTakingRads, radRate
      */
@@ -24,31 +29,38 @@ package loreout.widgets {
 
         private static const CMD_RADS:int = 400;
 
-        private static const PANEL_W:int = 300;
-        private static const PANEL_H:int = 110;
+        private static const PANEL_W:int = 160;
+        private static const PANEL_H:int = 160;
 
-        // Ring gauge geometry
+        // Ring geometry
         private static const ARC_START:Number = 135;
         private static const ARC_END:Number = 405;
         private static const ARC_SWEEP:Number = 270;
 
-        // Cyber panel assembly
-        private var cyberParts:Object;
-        private var panelShape:Shape;
-        private var headerParts:Object;
-        private var radIconSp:Sprite;
+        // Ring radii
+        private static const R_TICK:Number = 65;
+        private static const R_DATA:Number = 56;
+        private static const R_INNER:Number = 46;
+        private static const R_DOT:Number = 38;
 
-        // Gauge elements
+        // Center of rings (slightly below center for title space)
+        private static const CX:Number = 80;
+        private static const CY:Number = 88;
+
+        // Elements
+        private var panelBg:Shape;
         private var bgRing:Shape;
         private var fillRing:Shape;
-        private var innerRing:Shape;
         private var tickMarks:Shape;
+        private var innerRingSp:Sprite;
+        private var dotRing:Shape;
         private var needleContainer:Sprite;
-        private var microBarStrip:Sprite;
+        private var trefoilSp:Sprite;
 
-        // Content
+        // Text
         private var radValue:TextField;
         private var radLabel:TextField;
+        private var rateLabel:TextField;
 
         // State
         private var currentRads:Number = 0;
@@ -63,16 +75,8 @@ package loreout.widgets {
         private var tickCooldown:int = 60;
         private var frameCount:int = 0;
 
-        // DNA helix
-        private var dnaContainer:Sprite;
-        private var dnaPhase:Number = 0;
-        private static const DNA_SPEED:Number = 0.03;
-
-        // Ring center + radius
-        private var ringCX:Number = 0;
-        private var ringCY:Number = 0;
-        private var ringR:Number = 0;
-        private var innerR:Number = 0;
+        // Inner ring rotation
+        private var innerRotation:Number = 0;
 
         public function LoreOutRadsWidget() {
             super();
@@ -80,103 +84,162 @@ package loreout.widgets {
             addEventListener(Event.ENTER_FRAME, onFrame);
         }
 
+        // ================================================================
+        // BUILD UI
+        // ================================================================
         private function buildUI():void {
-            // === CYBER PANEL (all structural layers) ===
-            cyberParts = UIPrimitives.buildCyberPanel(this, PANEL_W, PANEL_H,
-                UIPrimitives.COL_ACCENT, "full", true, "RADIATION", "RAD-01");
-            panelShape = cyberParts.panel as Shape;
-            headerParts = cyberParts.header;
+            // Panel background (dark rect + border)
+            panelBg = new Shape();
+            var pg:* = panelBg.graphics;
+            pg.beginFill(UIPrimitives.COL_BG, 0.85);
+            pg.drawRect(0, 0, PANEL_W, PANEL_H);
+            pg.endFill();
+            pg.lineStyle(1, UIPrimitives.COL_BORDER, 0.40);
+            pg.drawRect(0, 0, PANEL_W, PANEL_H);
+            addChild(panelBg);
 
-            var contentY:Number = Number(cyberParts.contentY);
+            // Corner brackets
+            UIPrimitives.drawCornerBrackets(this, PANEL_W, PANEL_H, 8,
+                UIPrimitives.COL_ACCENT, 0.35);
 
-            // Trefoil icon on header — GLOWS (centered in 26px band)
-            radIconSp = new Sprite();
-            drawRadIcon(radIconSp, PANEL_W - 24, 15, 7);
-            addChild(radIconSp);
-            UIPrimitives.applyNeonGlow(radIconSp, UIPrimitives.COL_ACCENT, 0.3);
+            // "RADIATION" label top-center
+            var titleLabel:TextField = UIPrimitives.makeLabel(this,
+                "RADIATION", 9, 0.50, UIPrimitives.COL_TEXT_SEC);
+            titleLabel.width = PANEL_W;
+            var tFmt:TextFormat = titleLabel.defaultTextFormat;
+            tFmt.align = TextFormatAlign.CENTER;
+            titleLabel.defaultTextFormat = tFmt;
+            titleLabel.setTextFormat(tFmt);
+            titleLabel.x = 0;
+            titleLabel.y = 4;
 
-            // === RING GAUGE (bigger, readable) ===
-            var availH:Number = PANEL_H - contentY - 4;
-            ringR = (availH * 0.48);
-            if (ringR > 38) ringR = 38;
-            innerR = ringR - 7;
-            ringCX = PANEL_W * 0.30;
-            ringCY = contentY + availH * 0.52;
-
-            bgRing = UIPrimitives.drawRingArc(this,
-                ringCX, ringCY, ringR,
-                ARC_START, ARC_END,
-                UIPrimitives.COL_FRAME_LIGHT, 0.35, 6, 48);
-
-            innerRing = UIPrimitives.drawRingArc(this,
-                ringCX, ringCY, innerR,
-                ARC_START, ARC_END,
-                UIPrimitives.COL_BORDER, 0.20, 1.5, 48);
-
+            // Outer tick ring (36 ticks, major every 9th)
             tickMarks = UIPrimitives.drawRingTicks(this,
-                ringCX, ringCY, ringR,
+                CX, CY, R_TICK,
                 ARC_START, ARC_END,
-                27, 4, 2,
-                UIPrimitives.COL_FRAME_LIGHT, 0.50, 9);
+                36, 4, 2,
+                UIPrimitives.COL_BORDER, 0.40, 9);
 
+            // Background ring (dim arc at data radius)
+            bgRing = UIPrimitives.drawRingArc(this,
+                CX, CY, R_DATA,
+                ARC_START, ARC_END,
+                UIPrimitives.COL_FRAME, 0.20, 6, 48);
+
+            // Fill ring (dynamic, redrawn each frame)
             fillRing = new Shape();
             addChild(fillRing);
 
+            // Rotating inner detail ring (6 segmented arcs)
+            innerRingSp = new Sprite();
+            innerRingSp.x = CX;
+            innerRingSp.y = CY;
+            drawInnerDetailRing();
+            addChild(innerRingSp);
+
+            // Innermost dotted ring (static)
+            dotRing = new Shape();
+            var dg:* = dotRing.graphics;
+            var dotCount:int = 48;
+            for (var i:int = 0; i < dotCount; i++) {
+                var angle:Number = (i / dotCount) * Math.PI * 2;
+                dg.beginFill(UIPrimitives.COL_FRAME, 0.15);
+                dg.drawCircle(CX + Math.cos(angle) * R_DOT,
+                    CY + Math.sin(angle) * R_DOT, 0.7);
+                dg.endFill();
+            }
+            addChild(dotRing);
+
+            // Needle container
             needleContainer = new Sprite();
             addChild(needleContainer);
 
-            // === CENTER READOUT (bigger, readable) ===
-            radValue = UIPrimitives.makeValue(this, "0", 22, 0.97, UIPrimitives.COL_ACCENT);
+            // Center readout — value (22px, white)
+            radValue = UIPrimitives.makeValue(this, "0", 22, 0.97, 0xFFFFFF);
             radValue.width = 60;
-            radValue.x = ringCX - 30;
-            radValue.y = ringCY - 16;
+            radValue.x = CX - 30;
+            radValue.y = CY - 16;
             var vfmt:TextFormat = radValue.defaultTextFormat;
             vfmt.align = TextFormatAlign.CENTER;
             radValue.defaultTextFormat = vfmt;
             radValue.setTextFormat(vfmt);
 
-            radLabel = UIPrimitives.makeLabel(this, "RAD", 9, 0.65, UIPrimitives.COL_ACCENT);
+            // Center readout — "RAD" label (8px, grey)
+            radLabel = UIPrimitives.makeLabel(this, "RAD", 8, 0.50,
+                UIPrimitives.COL_TEXT_SEC);
             radLabel.width = 40;
-            radLabel.x = ringCX - 20;
-            radLabel.y = ringCY + 6;
+            radLabel.x = CX - 20;
+            radLabel.y = CY + 6;
             var lfmt:TextFormat = radLabel.defaultTextFormat;
             lfmt.align = TextFormatAlign.CENTER;
             radLabel.defaultTextFormat = lfmt;
             radLabel.setTextFormat(lfmt);
 
-            // Center hub dot
-            var hub:Shape = new Shape();
-            hub.graphics.beginFill(UIPrimitives.COL_BORDER, 0.4);
-            hub.graphics.drawCircle(ringCX, ringCY, 2);
-            hub.graphics.endFill();
-            addChild(hub);
+            // Trefoil icon (bottom-left corner)
+            trefoilSp = new Sprite();
+            drawTrefoil(trefoilSp, 16, PANEL_H - 14, 6);
+            addChild(trefoilSp);
 
-            // === MICRO BAR STRIP (right side) ===
-            var barX:Number = ringCX + ringR + 12;
-            microBarStrip = UIPrimitives.drawMicroBarStrip(this,
-                barX, contentY + 6,
-                12, 3, availH - 14, 2, 0,
-                UIPrimitives.COL_ACCENT, UIPrimitives.COL_BAR_BG, 0.65);
+            // Rate indicator (right side, hidden by default)
+            rateLabel = UIPrimitives.makeLabel(this, "", 8, 0.70,
+                UIPrimitives.COL_TEXT_SEC);
+            rateLabel.x = PANEL_W - 50;
+            rateLabel.y = PANEL_H - 18;
+            rateLabel.width = 46;
+            rateLabel.visible = false;
 
-            // DNA helix container
-            dnaContainer = new Sprite();
-            addChild(dnaContainer);
-            setChildIndex(dnaContainer, getChildIndex(bgRing));
-
+            // Data tag below panel
+            var tag:TextField = UIPrimitives.makeDataTag(this, "RAD-01", 8,
+                UIPrimitives.COL_FRAME_LIGHT, 0.30);
+            tag.x = PANEL_W * 0.5 - 20;
+            tag.y = PANEL_H + 1;
         }
 
-        private function drawRadIcon(container:Sprite, cx:Number, cy:Number, radius:Number):void {
+        // 6 segmented arcs with gaps (drawn at origin, sprite positioned at CX,CY)
+        private function drawInnerDetailRing():void {
+            var g:* = innerRingSp.graphics;
+            g.clear();
+
+            var segCount:int = 6;
+            var gapDeg:Number = 8;
+            var segSweep:Number = (360 - segCount * gapDeg) / segCount;
+
+            g.lineStyle(1.5, UIPrimitives.COL_BORDER, 0.25);
+
+            for (var seg:int = 0; seg < segCount; seg++) {
+                var startDeg:Number = seg * (segSweep + gapDeg);
+                var endDeg:Number = startDeg + segSweep;
+                var steps:int = 12;
+
+                for (var i:int = 0; i <= steps; i++) {
+                    var t:Number = i / steps;
+                    var angleDeg:Number = startDeg + t * (endDeg - startDeg);
+                    var angleRad:Number = angleDeg * Math.PI / 180;
+                    var px:Number = Math.cos(angleRad) * R_INNER;
+                    var py:Number = Math.sin(angleRad) * R_INNER;
+                    if (i == 0) g.moveTo(px, py);
+                    else g.lineTo(px, py);
+                }
+            }
+        }
+
+        // Trefoil (radiation symbol) icon
+        private function drawTrefoil(container:Sprite,
+            cx:Number, cy:Number, radius:Number):void {
             var g:* = container.graphics;
-            var col:uint = 0xFFFFFF;
+            var col:uint = UIPrimitives.COL_BORDER;
             var r:Number = radius * 0.35;
             var dist:Number = radius * 0.45;
-            g.beginFill(col, 0.7);
+
+            g.beginFill(col, 0.5);
             g.drawCircle(cx, cy, r * 0.6);
             g.endFill();
+
             for (var i:int = 0; i < 3; i++) {
                 var angle:Number = (i * 120 - 90) * Math.PI / 180;
-                g.beginFill(col, 0.5);
-                g.drawCircle(cx + Math.cos(angle) * dist, cy + Math.sin(angle) * dist, r);
+                g.beginFill(col, 0.35);
+                g.drawCircle(cx + Math.cos(angle) * dist,
+                    cy + Math.sin(angle) * dist, r);
                 g.endFill();
             }
         }
@@ -193,7 +256,7 @@ package loreout.widgets {
 
             var needleTarget:Number = ARC_START + pct * ARC_SWEEP;
 
-            // Geiger tick
+            // Geiger tick jitter
             tickTimer++;
             if (isTakingRads) tickCooldown = 3 + int(Math.random() * 5);
             else if (pct > 0.75) tickCooldown = 8 + int(Math.random() * 12);
@@ -212,23 +275,30 @@ package loreout.widgets {
             if (needleCurrent < ARC_START - 5) needleCurrent = ARC_START - 5;
             if (needleCurrent > ARC_END + 5) needleCurrent = ARC_END + 5;
 
-            dnaPhase += DNA_SPEED * (1 + pct * 3 + (isTakingRads ? 3 : 0));
+            // Rotate inner detail ring (speed scales with radiation)
+            var rotSpeed:Number = 0.15;
+            if (isTakingRads) rotSpeed = 1.2;
+            else if (pct > 0.5) rotSpeed = 0.5;
+            else if (pct > 0.25) rotSpeed = 0.3;
+            innerRotation += rotSpeed;
+            innerRingSp.rotation = innerRotation;
 
             drawFillRing(pct);
             drawNeedle(pct);
             drawStaticNoise(pct);
-            drawDNA(pct);
-            updateMicroBar(pct);
             updateReadout(pct);
         }
 
         // ================================================================
-        // FILL RING — GLOWS (glow on the gauge, not the panel)
+        // FILL RING (data arc — 6px thick, 270deg)
         // ================================================================
         private function drawFillRing(pct:Number):void {
             var g:* = fillRing.graphics;
             g.clear();
-            if (pct <= 0) return;
+            if (pct <= 0) {
+                fillRing.filters = [];
+                return;
+            }
 
             var col:uint = getRadColor(pct);
             var fillEnd:Number = ARC_START + pct * ARC_SWEEP;
@@ -237,47 +307,59 @@ package loreout.widgets {
             var steps:int = int(pct * 48);
             if (steps < 2) steps = 2;
 
-            g.lineStyle(5, col, 0.85);
+            g.lineStyle(6, col, 0.85);
             for (var i:int = 0; i <= steps; i++) {
                 var t:Number = i / steps;
                 var angle:Number = startRad + t * (endRad - startRad);
-                var px:Number = ringCX + Math.cos(angle) * ringR;
-                var py:Number = ringCY + Math.sin(angle) * ringR;
+                var px:Number = CX + Math.cos(angle) * R_DATA;
+                var py:Number = CY + Math.sin(angle) * R_DATA;
                 if (i == 0) g.moveTo(px, py);
                 else g.lineTo(px, py);
             }
 
-            if (pct > 0.3) {
+            // Glow: subtle at mid, strong red at high
+            if (pct >= 0.75) {
                 fillRing.filters = [new GlowFilter(col, 0.45, 6, 6, 1.5, 1)];
+            } else if (pct > 0.3) {
+                fillRing.filters = [new GlowFilter(col, 0.20, 4, 4, 1.0, 1)];
             } else {
                 fillRing.filters = [];
             }
         }
 
         // ================================================================
-        // NEEDLE
+        // NEEDLE (from inner ring to data ring)
         // ================================================================
         private function drawNeedle(pct:Number):void {
             var g:* = needleContainer.graphics;
             g.clear();
 
             var angleRad:Number = (needleCurrent - 90) * Math.PI / 180;
-            var tipX:Number = ringCX + Math.cos(angleRad) * (ringR - 3);
-            var tipY:Number = ringCY + Math.sin(angleRad) * (ringR - 3);
+            var tipX:Number = CX + Math.cos(angleRad) * (R_DATA + 3);
+            var tipY:Number = CY + Math.sin(angleRad) * (R_DATA + 3);
+            var baseX:Number = CX + Math.cos(angleRad) * (R_DOT - 2);
+            var baseY:Number = CY + Math.sin(angleRad) * (R_DOT - 2);
             var col:uint = getRadColor(pct);
 
-            g.lineStyle(2, col, 0.95);
-            g.moveTo(ringCX, ringCY);
+            // Needle line
+            g.lineStyle(1.5, col, 0.80);
+            g.moveTo(baseX, baseY);
             g.lineTo(tipX, tipY);
 
-            g.lineStyle(0);
+            // Tip dot
+            g.lineStyle();
             g.beginFill(col, 0.90);
-            g.drawCircle(tipX, tipY, 2.5);
+            g.drawCircle(tipX, tipY, 2);
+            g.endFill();
+
+            // Center hub
+            g.beginFill(UIPrimitives.COL_BORDER, 0.50);
+            g.drawCircle(CX, CY, 2.5);
             g.endFill();
         }
 
         // ================================================================
-        // STATIC NOISE
+        // STATIC NOISE (scattered dots when irradiated)
         // ================================================================
         private function drawStaticNoise(pct:Number):void {
             while (needleContainer.numChildren > 0) {
@@ -285,8 +367,8 @@ package loreout.widgets {
             }
             if (!isTakingRads && pct < 0.3) return;
 
-            var count:int = int(pct * 12);
-            if (isTakingRads) count += 8;
+            var count:int = int(pct * 10);
+            if (isTakingRads) count += 6;
             var ng:* = needleContainer.graphics;
             var startRad:Number = (ARC_START - 90) * Math.PI / 180;
             var endRad:Number = (ARC_END - 90) * Math.PI / 180;
@@ -294,104 +376,17 @@ package loreout.widgets {
             for (var i:int = 0; i < count; i++) {
                 var t:Number = Math.random();
                 var angle:Number = startRad + t * (endRad - startRad);
-                var r:Number = ringR * (0.3 + Math.random() * 0.7);
-                var dotAlpha:Number = 0.15 + Math.random() * 0.35;
-                var dotColor:uint = (Math.random() > 0.5) ? UIPrimitives.COL_WARN : UIPrimitives.COL_AMBER;
-                ng.lineStyle(0);
+                var r:Number = R_DOT + Math.random() * (R_TICK - R_DOT);
+                var dotAlpha:Number = 0.10 + Math.random() * 0.25;
+                var dotColor:uint = (pct >= 0.75) ?
+                    UIPrimitives.COL_WARN : UIPrimitives.COL_ACCENT;
+                ng.lineStyle();
                 ng.beginFill(dotColor, dotAlpha);
-                ng.drawCircle(ringCX + Math.cos(angle) * r,
-                    ringCY + Math.sin(angle) * r,
-                    0.5 + Math.random() * 1.2);
+                ng.drawCircle(CX + Math.cos(angle) * r,
+                    CY + Math.sin(angle) * r,
+                    0.5 + Math.random() * 1.0);
                 ng.endFill();
             }
-        }
-
-        // ================================================================
-        // DNA HELIX — GLOWS
-        // ================================================================
-        private function drawDNA(pct:Number):void {
-            var g:* = dnaContainer.graphics;
-            g.clear();
-
-            var col:uint = getRadColor(pct);
-            var dnaAlpha:Number = 0.12 + pct * 0.50;
-
-            var dnaX:Number = ringCX + ringR + 14;
-            var dnaTopY:Number = 24;
-            var dnaBotY:Number = PANEL_H - 8;
-            var dnaH:Number = dnaBotY - dnaTopY;
-            var dnaW:Number = 20;
-            var steps:int = 40;
-            var rungEvery:int = 3;
-            var twists:Number = 4;
-
-            var s1x:Array = [];
-            var s1y:Array = [];
-            var s2x:Array = [];
-            var s2y:Array = [];
-
-            for (var i:int = 0; i <= steps; i++) {
-                var t:Number = i / steps;
-                var y:Number = dnaTopY + t * dnaH;
-                var angle:Number = dnaPhase + t * Math.PI * 2 * twists;
-                var x1:Number = dnaX + Math.sin(angle) * dnaW * 0.5;
-                var x2:Number = dnaX + Math.sin(angle + Math.PI) * dnaW * 0.5;
-                s1x.push(x1); s1y.push(y);
-                s2x.push(x2); s2y.push(y);
-            }
-
-            g.lineStyle(2, col, dnaAlpha);
-            g.moveTo(Number(s1x[0]), Number(s1y[0]));
-            for (i = 1; i <= steps; i++) {
-                g.lineTo(Number(s1x[i]), Number(s1y[i]));
-            }
-
-            g.lineStyle(2, col, dnaAlpha * 0.65);
-            g.moveTo(Number(s2x[0]), Number(s2y[0]));
-            for (i = 1; i <= steps; i++) {
-                g.lineTo(Number(s2x[i]), Number(s2y[i]));
-            }
-
-            for (i = 0; i <= steps; i += rungEvery) {
-                var rungAlpha:Number = dnaAlpha * 0.35;
-                var rungAngle:Number = dnaPhase + (i / steps) * Math.PI * 2 * twists;
-                var depth:Number = Math.abs(Math.cos(rungAngle));
-                if (depth > 0.3) {
-                    g.lineStyle(1, col, rungAlpha * depth);
-                    g.moveTo(Number(s1x[i]), Number(s1y[i]));
-                    g.lineTo(Number(s2x[i]), Number(s2y[i]));
-                    g.lineStyle(0);
-                    g.beginFill(col, rungAlpha * depth * 1.5);
-                    g.drawCircle(Number(s1x[i]), Number(s1y[i]), 1.5);
-                    g.endFill();
-                    g.beginFill(col, rungAlpha * depth * 1.5);
-                    g.drawCircle(Number(s2x[i]), Number(s2y[i]), 1.5);
-                    g.endFill();
-                }
-            }
-
-            if (pct > 0.15) {
-                dnaContainer.filters = [new GlowFilter(col, 0.2 + pct * 0.4, 4, 4, 1.2, 1)];
-            } else {
-                dnaContainer.filters = [];
-            }
-        }
-
-        // ================================================================
-        // UPDATE MICRO BAR
-        // ================================================================
-        private function updateMicroBar(pct:Number):void {
-            if (microBarStrip && microBarStrip.parent) microBarStrip.parent.removeChild(microBarStrip);
-
-            var barX:Number = ringCX + ringR + 12;
-            var contentY:Number = 22;
-            var availH:Number = PANEL_H - contentY - 4;
-            var col:uint = getRadColor(pct);
-
-            microBarStrip = UIPrimitives.drawMicroBarStrip(this,
-                barX, contentY + 6,
-                12, 3, availH - 14, 2, pct * 100,
-                col, UIPrimitives.COL_BAR_BG, 0.65);
         }
 
         // ================================================================
@@ -400,16 +395,11 @@ package loreout.widgets {
         private function updateReadout(pct:Number):void {
             var col:uint = getRadColor(pct);
 
-            // Recolor cyber panel (grey frame stays, accent trim + header shift)
-            var hdrAlpha:Number = (pct > 0.75) ? 0.65 : 0.55;
-            UIPrimitives.recolorCyberPanel(cyberParts, col, hdrAlpha);
-
-            // Recolor trefoil icon glow
-            UIPrimitives.applyNeonGlow(radIconSp, col, (pct > 0.5) ? 0.5 : 0.3);
-
-            // Rad value
+            // Center value (pulses alpha when taking rads)
             var valAlpha:Number = 0.97;
-            if (isTakingRads) valAlpha = 0.6 + Math.sin(frameCount * 0.15) * 0.4;
+            if (isTakingRads) {
+                valAlpha = 0.6 + Math.sin(frameCount * 0.15) * 0.4;
+            }
             radValue.text = String(int(currentRads));
             radValue.alpha = valAlpha;
             var vfmt:TextFormat = radValue.defaultTextFormat;
@@ -418,20 +408,29 @@ package loreout.widgets {
             radValue.defaultTextFormat = vfmt;
             radValue.setTextFormat(vfmt);
 
-            var lfmt:TextFormat = radLabel.defaultTextFormat;
-            lfmt.color = col;
-            lfmt.align = TextFormatAlign.CENTER;
-            radLabel.defaultTextFormat = lfmt;
-            radLabel.setTextFormat(lfmt);
+            // Rate indicator (appears when taking rads)
+            if (isTakingRads && radRate > 0) {
+                rateLabel.visible = true;
+                rateLabel.text = "+" + radRate.toFixed(1) + "/s";
+                var rfmt:TextFormat = rateLabel.defaultTextFormat;
+                rfmt.color = col;
+                rateLabel.defaultTextFormat = rfmt;
+                rateLabel.setTextFormat(rfmt);
+            } else {
+                rateLabel.visible = false;
+            }
         }
 
+        // White < 50%, grey 50-75%, red >= 75%
         private function getRadColor(pct:Number):uint {
-            if (pct < 0.25) return UIPrimitives.COL_ACCENT;
-            if (pct < 0.50) return 0x88CC22;
-            if (pct < 0.75) return UIPrimitives.COL_AMBER;
-            return UIPrimitives.COL_WARN;
+            if (pct >= 0.75) return UIPrimitives.COL_WARN;
+            if (pct >= 0.50) return UIPrimitives.COL_AMBER;
+            return UIPrimitives.COL_ACCENT;
         }
 
+        // ================================================================
+        // UPDATE DATA
+        // ================================================================
         private function updateRads(rads:Number, maxR:Number,
                                      taking:Boolean, rate:Number):void {
             currentRads = rads;

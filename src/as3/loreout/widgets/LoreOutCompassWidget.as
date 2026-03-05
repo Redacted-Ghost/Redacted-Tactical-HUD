@@ -117,7 +117,7 @@ package loreout.widgets {
             // Center pointer — fixed triangles (NOT in tape, don't scroll)
             var cm:Shape = new Shape();
             var cg:* = cm.graphics;
-            cg.lineStyle(0);
+            cg.lineStyle();
             // Top pointer
             cg.beginFill(UIPrimitives.COL_TEXT_VAL, 0.9);
             cg.moveTo(CX - 3, 0);
@@ -175,7 +175,7 @@ package loreout.widgets {
                     g.moveTo(px, TAPE_CY - 3);
                     g.lineTo(px, TAPE_CY + 3);
                 } else {
-                    g.lineStyle(0);
+                    g.lineStyle();
                     g.beginFill(UIPrimitives.COL_BORDER, 0.10);
                     g.drawCircle(px, TAPE_CY, 0.5);
                     g.endFill();
@@ -198,7 +198,7 @@ package loreout.widgets {
                     var d:int = baseDeg + rep * 360;
                     if (d >= TAPE_MIN_DEG && d <= TAPE_MAX_DEG) {
                         var lpx:Number = d * DEG_TO_PX;
-                        var col:uint = card.isNorth ? UIPrimitives.COL_WARN : UIPrimitives.COL_TEXT_PRI;
+                        var col:uint = card.isNorth ? UIPrimitives.COL_ACCENT : UIPrimitives.COL_TEXT_PRI;
                         var alph:Number = card.isNorth ? 0.95 : 0.75;
 
                         var tf:TextField = makeLabel(String(card.letter), 11, col);
@@ -241,7 +241,7 @@ package loreout.widgets {
                 var d:Number = absDeg + rep * 360;
                 if (d >= TAPE_MIN_DEG && d <= TAPE_MAX_DEG) {
                     var px:Number = d * DEG_TO_PX;
-                    g.lineStyle(0);
+                    g.lineStyle();
                     if (isHostile) {
                         // Red triangle (bottom edge)
                         g.beginFill(UIPrimitives.COL_WARN, 0.9);

@@ -24,9 +24,9 @@ Int TIMER_REGISTER = 0 Const
 Int TIMER_UPDATE = 1 Const
 
 ; HUDFramework virtual stage: 1280x720
-; Right-side stack bottom. v11: 300x110 → (964, 602)
-Float Property WIDGET_X = 964.0 Auto Const
-Float Property WIDGET_Y = 602.0 Auto Const
+; Right-side stack bottom. v12: 320x130 tactical panel → (944, 580)
+Float Property WIDGET_X = 944.0 Auto Const
+Float Property WIDGET_Y = 580.0 Auto Const
 
 ; Background poll interval (for ammo data that has no event)
 Float POLL_INTERVAL = 0.5 Const

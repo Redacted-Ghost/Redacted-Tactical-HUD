@@ -24,10 +24,9 @@ Int TIMER_REGISTER = 0 Const
 Int TIMER_UPDATE = 1 Const
 Int TIMER_WEATHER = 2 Const
 
-; Position: right-side stack top. v11: 300x54 → (964, 540)
-; Status(540)+54=594, 8px gap → Combat at 602
+; Position: right-side above combat. v12: 300x70 → (964, 502)
 Float Property WIDGET_X = 964.0 Auto Const
-Float Property WIDGET_Y = 540.0 Auto Const
+Float Property WIDGET_Y = 502.0 Auto Const
 
 ; Poll intervals
 Float POLL_INTERVAL = 0.5 Const

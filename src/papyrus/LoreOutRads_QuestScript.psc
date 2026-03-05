@@ -18,10 +18,9 @@ String Property WIDGET_FILE = "LoreOutRadsWidget.swf" Auto Const
 Int TIMER_REGISTER = 0 Const
 Int TIMER_UPDATE = 1 Const
 
-; Position: left-side stack bottom. v11: 300x110 → (16, 602)
-; Bottom of left stack (602+110=712, near screen bottom)
-Float Property WIDGET_X = 16.0 Auto Const
-Float Property WIDGET_Y = 602.0 Auto Const
+; Position: bottom-left. v12: 160x160 ring scanner → (20, 540)
+Float Property WIDGET_X = 20.0 Auto Const
+Float Property WIDGET_Y = 540.0 Auto Const
 
 ; Poll interval
 Float POLL_INTERVAL = 0.5 Const

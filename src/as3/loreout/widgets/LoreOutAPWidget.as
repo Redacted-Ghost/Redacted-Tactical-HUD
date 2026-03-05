@@ -11,13 +11,17 @@ package loreout.widgets {
     import loreout.ui.UIPrimitives;
 
     /**
-     * LoreOut AP Widget v11 — Tactical panel energy bar.
+     * LoreOut AP Widget v12 — Energy Bar.
      *
-     * 192x24 with chamfered slim tactical panel, blue accent,
-     * glowing bolt icon, segmented bar, value readout.
-     * Panel outline shifts: blue(normal) → amber(low) → red(critical).
+     * 300x32 slim panel with segmented bar:
+     *   - Bolt icon + "AP" label
+     *   - 15-segment bar with quarter-mark ticks
+     *   - Numeric value right-aligned
+     *   - VATS mode: subtle white glow pulse
      *
-     * CMD 600 (floats): currentAP, maxAP, isInVATS, 0, 0, 0
+     * White (normal), grey (low), red (critical).
+     *
+     * CMD 600 (floats): currentAP, maxAP, isInVATS
      */
     public class LoreOutAPWidget extends MovieClip implements IHUDWidget {
 
@@ -26,7 +30,7 @@ package loreout.widgets {
 
         // ---- LAYOUT ----
         private static const PANEL_W:int = 300;
-        private static const PANEL_H:int = 28;
+        private static const PANEL_H:int = 32;
         private static const PAD:int = 6;
 
         // ---- BAR GEOMETRY ----
@@ -34,10 +38,10 @@ package loreout.widgets {
         private static const BAR_SEGMENTS:int = 15;
 
         // ---- ELEMENTS ----
-        private var cyberParts:Object;
-        private var panelShape:Shape;
+        private var panelBg:Shape;
         private var boltIcon:Shape;
         private var barContainer:Sprite;
+        private var quarterTicks:Shape;
         private var apLabel:TextField;
         private var apValue:TextField;
 
@@ -63,40 +67,56 @@ package loreout.widgets {
         // BUILD UI
         // ================================================================
         private function buildUI():void {
-            // === CYBER PANEL (slim, minimal structural) ===
-            cyberParts = UIPrimitives.buildCyberPanel(this, PANEL_W, PANEL_H,
-                UIPrimitives.COL_BLUE, "slim");
-            panelShape = cyberParts.panel as Shape;
+            // Panel background (dark rect + border, simple slim)
+            panelBg = new Shape();
+            var pg:* = panelBg.graphics;
+            pg.beginFill(UIPrimitives.COL_BG, 0.85);
+            pg.drawRect(0, 0, PANEL_W, PANEL_H);
+            pg.endFill();
+            pg.lineStyle(1, UIPrimitives.COL_BORDER, 0.40);
+            pg.drawRect(0, 0, PANEL_W, PANEL_H);
+            addChild(panelBg);
 
-            // Bolt icon (left, inside panel) — GLOWS
-            boltIcon = UIPrimitives.drawBoltIcon(this, 12, 14, 12,
-                UIPrimitives.COL_BLUE, 0.65);
-            UIPrimitives.applyNeonGlow(boltIcon, UIPrimitives.COL_BLUE, 0.25);
+            // Bolt icon (left, white)
+            boltIcon = UIPrimitives.drawBoltIcon(this, 12, 10, 12,
+                UIPrimitives.COL_ACCENT, 0.65);
 
-            // AP label
-            apLabel = UIPrimitives.makeLabel(this, "AP", 10, 0.80,
-                UIPrimitives.COL_BLUE);
+            // AP label (grey)
+            apLabel = UIPrimitives.makeLabel(this, "AP", 10, 0.60,
+                UIPrimitives.COL_TEXT_SEC);
             apLabel.x = 22;
-            apLabel.y = -3;
+            apLabel.y = 0;
 
-            // AP value (right-aligned)
-            apValue = UIPrimitives.makeValue(this, "0", 11, 0.95, 0xFFFFFF);
+            // AP value (right-aligned, white)
+            apValue = UIPrimitives.makeValue(this, "0", 11, 0.95,
+                0xFFFFFF);
             apValue.x = PANEL_W - 50;
-            apValue.y = -4;
+            apValue.y = -1;
             apValue.width = 44;
             var vfmt:TextFormat = apValue.defaultTextFormat;
             vfmt.align = TextFormatAlign.RIGHT;
             apValue.defaultTextFormat = vfmt;
             apValue.setTextFormat(vfmt);
 
-            // Bar layout (inside panel, wide)
+            // Bar layout
             barX = 24;
-            barY = 14;
+            barY = 16;
             barW = PANEL_W - 30;
 
-            // Bar container (initial empty)
+            // Initial bar
             barContainer = UIPrimitives.drawSegmentedBar(this,
                 barX, barY, barW, BAR_H, 0, BAR_SEGMENTS);
+
+            // Quarter-mark ticks below bar (at 25%, 50%, 75%)
+            quarterTicks = new Shape();
+            var qg:* = quarterTicks.graphics;
+            qg.lineStyle(0.5, UIPrimitives.COL_FRAME, 0.25);
+            for (var q:int = 1; q <= 3; q++) {
+                var qx:Number = barX + barW * (q * 0.25);
+                qg.moveTo(qx, barY + BAR_H + 1);
+                qg.lineTo(qx, barY + BAR_H + 3);
+            }
+            addChild(quarterTicks);
         }
 
         // ================================================================
@@ -121,20 +141,23 @@ package loreout.widgets {
             if (pct > 100) pct = 100;
             if (pct < 0) pct = 0;
 
-            // Color based on AP level
-            var col:uint = UIPrimitives.COL_BLUE;
+            // Color: white > grey > red
+            var col:uint = UIPrimitives.COL_ACCENT;
             if (pct < 30) col = UIPrimitives.COL_WARN;
             else if (pct < 50) col = UIPrimitives.COL_AMBER;
 
             barContainer = UIPrimitives.drawSegmentedBar(this,
                 barX, barY, barW, BAR_H, pct, BAR_SEGMENTS, col);
 
-            // VATS pulse — glow on the bar (not the panel)
+            // VATS pulse — subtle white glow
             if (isInVATS) {
-                var vatsAlpha:Number = 0.3 + Math.sin(frameCount * 0.2) * 0.3;
-                barContainer.filters = [new GlowFilter(col, vatsAlpha, 6, 3, 1.5, 1)];
+                var vatsAlpha:Number = 0.2 +
+                    Math.sin(frameCount * 0.2) * 0.2;
+                barContainer.filters = [
+                    new GlowFilter(0xFFFFFF, vatsAlpha, 6, 3, 1.5, 1)];
             } else if (pct < 30) {
-                barContainer.filters = [new GlowFilter(col, 0.3, 4, 2, 1.2, 1)];
+                barContainer.filters = [
+                    new GlowFilter(col, 0.3, 4, 2, 1.2, 1)];
             } else {
                 barContainer.filters = [];
             }
@@ -148,33 +171,24 @@ package loreout.widgets {
 
             apValue.text = String(int(currentAP));
 
-            // Determine color for value + panel outline
+            // Value color
             var col:uint;
-            if (pct > 0.5) {
-                col = UIPrimitives.COL_BLUE;
-            } else if (pct > 0.3) {
-                col = UIPrimitives.COL_AMBER;
-            } else {
-                col = UIPrimitives.COL_WARN;
-            }
+            if (pct > 0.5) col = UIPrimitives.COL_ACCENT;
+            else if (pct > 0.3) col = UIPrimitives.COL_AMBER;
+            else col = UIPrimitives.COL_WARN;
 
             var vfmt:TextFormat = apValue.defaultTextFormat;
             vfmt.color = col;
             vfmt.align = TextFormatAlign.RIGHT;
             apValue.defaultTextFormat = vfmt;
             apValue.setTextFormat(vfmt);
-
-            // Recolor cyber panel (grey frame stays, accent trim shifts)
-            UIPrimitives.recolorCyberPanel(cyberParts, col);
-
-            // Recolor bolt icon glow to match
-            UIPrimitives.applyNeonGlow(boltIcon, col, 0.25);
         }
 
         // ================================================================
         // UPDATE DATA
         // ================================================================
-        private function updateAP(ap:Number, apMax:Number, vats:Boolean):void {
+        private function updateAP(ap:Number, apMax:Number,
+            vats:Boolean):void {
             currentAP = ap;
             if (apMax > 0) maxAP = apMax;
             isInVATS = vats;

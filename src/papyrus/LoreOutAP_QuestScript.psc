@@ -18,10 +18,9 @@ String Property WIDGET_FILE = "LoreOutAPWidget.swf" Auto Const
 Int TIMER_REGISTER = 0 Const
 Int TIMER_UPDATE = 1 Const
 
-; Position: left-side stack top. v11: 300x28 → (16, 488)
-; AP(488)+28=516, 8px gap → Vitals at 524
-Float Property WIDGET_X = 16.0 Auto Const
-Float Property WIDGET_Y = 488.0 Auto Const
+; Position: right-side above status. v12: 300x32 energy bar → (964, 468)
+Float Property WIDGET_X = 964.0 Auto Const
+Float Property WIDGET_Y = 468.0 Auto Const
 
 ; Poll interval (faster than rads since AP changes during combat/sprinting)
 Float POLL_INTERVAL = 0.25 Const

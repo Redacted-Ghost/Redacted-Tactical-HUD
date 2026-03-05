@@ -11,21 +11,16 @@ package loreout.widgets {
     import loreout.ui.UIPrimitives;
 
     /**
-     * LoreOut Combat Widget v11 — Tactical panel weapon module.
+     * LoreOut Combat Widget v12 — Tactical Data Panel.
      *
-     * 200x96 with chamfered tactical panel, chevron header,
-     * divider line with terminus dots, leader line callout,
-     * simplified ammo readout, chase light on chamfered perimeter.
-     * Panel outline shifts: amber(clear/caution) → red(danger).
+     * 320x130 Cyberpunk-style layered data panel:
+     *   - Coordinate references above panel
+     *   - Weapon name + threat status badge header
+     *   - Large ammo readout (MAG) + reserve count
+     *   - Ammo type + hostile count + threat dot
+     *   - Animated "SCANNING" status line
      *
-     * Layout:
-     *   ┌──────────────────────────────────┐
-     *   │ [header] MK18 SOPMOD        ●CLR │
-     *   │──────────────────────────────────│
-     *   │  030 / 030    383               │
-     *   │  5.56MM ROUND          🔊×1     │
-     *   └──────────────────────────────────┘
-     *   ••• [WPN-01] •••
+     * White/grey monochrome, red for danger only.
      *
      * CMD 200 (floats): magCur, magCap, reserve, spareMags, threat, hostiles
      * CMD 201 (string): weapon name
@@ -37,35 +32,37 @@ package loreout.widgets {
         private static const CMD_WEAPON_NAME:int = 201;
         private static const CMD_AMMO_TYPE:int = 202;
 
-        private static const PANEL_W:int = 300;
-        private static const PANEL_H:int = 110;
-        private static const PAD:int = 6;
+        private static const PANEL_W:int = 320;
+        private static const PANEL_H:int = 130;
+        private static const PAD:int = 10;
 
-        // Cyber panel assembly
-        private var cyberParts:Object;
-        private var panelShape:Shape;
-        private var headerParts:Object;
-
-        // Content
-        private var weaponField:TextField;
+        // Elements
+        private var panelBg:Shape;
+        private var threatBadge:Sprite;
         private var threatDot:Shape;
-        private var threatField:TextField;
+        private var alertIcon:Shape;
+
+        // Text fields
+        private var weaponField:TextField;
         private var ammoField:TextField;
+        private var magLabel:TextField;
+        private var reserveField:TextField;
+        private var reserveLabel:TextField;
         private var ammoTypeField:TextField;
         private var hostileField:TextField;
-        private var alertIcon:Shape;
+        private var scanField:TextField;
 
         // State
         private var currentThreat:int = 0;
         private var frameCount:int = 0;
+        private var scanPhase:int = 0;
 
-        // Chase light animation
-        private var chaseContainer:Sprite;
-        private var chasePos:Number = 0;
-        private static const CHASE_SPEED:Number = 0.003;
-
-        // Bottom row Y (for alert icon recreation)
-        private var bottomRowY:Number = 0;
+        // Smooth ammo transition
+        private var displayMag:Number = 0;
+        private var targetMag:Number = 0;
+        private var displayReserve:Number = 0;
+        private var targetReserve:Number = 0;
+        private var magCap:int = 0;
 
         public function LoreOutCombatWidget() {
             super();
@@ -74,166 +71,130 @@ package loreout.widgets {
             addEventListener(Event.ENTER_FRAME, onFrame);
         }
 
-        private function onFrame(e:Event):void {
-            frameCount++;
-
-            // Threat dot breathing glow
-            if (currentThreat > 0) {
-                var dotCol:uint = (currentThreat == 2) ? UIPrimitives.COL_WARN : UIPrimitives.COL_AMBER;
-                var dotGlow:Number = UIPrimitives.pulseValue(0.5, 0.35, frameCount, 0.07);
-                UIPrimitives.applyNeonGlow(threatDot, dotCol, dotGlow);
-            }
-
-            // Chase light animation
-            var speed:Number = CHASE_SPEED;
-            if (currentThreat == 2) speed = CHASE_SPEED * 2.5;
-            else if (currentThreat == 1) speed = CHASE_SPEED * 1.5;
-            chasePos = (chasePos + speed) % 1.0;
-            drawChaseLight();
-        }
-
-        // ================================================================
-        // CHASE LIGHT — glowing dot flowing around tactical panel perimeter
-        // ================================================================
-        private function drawChaseLight():void {
-            var g:* = chaseContainer.graphics;
-            g.clear();
-
-            // Chamfered polygon path (tactical panel edges)
-            var path:Object = UIPrimitives.getTacticalPanelPath(PANEL_W, PANEL_H, "full");
-            var vx:Array = path.vx;
-            var vy:Array = path.vy;
-
-            // Calculate segment lengths
-            var segLens:Array = [];
-            var totalLen:Number = 0;
-            var numSegs:int = vx.length - 1;
-            for (var s:int = 0; s < numSegs; s++) {
-                var dx:Number = Number(vx[s + 1]) - Number(vx[s]);
-                var dy:Number = Number(vy[s + 1]) - Number(vy[s]);
-                var len:Number = Math.sqrt(dx * dx + dy * dy);
-                segLens.push(len);
-                totalLen += len;
-            }
-
-            // Find position on perimeter
-            var dist:Number = chasePos * totalLen;
-            var accumulated:Number = 0;
-            var px:Number = Number(vx[0]);
-            var py:Number = Number(vy[0]);
-
-            for (s = 0; s < numSegs; s++) {
-                var segLen:Number = Number(segLens[s]);
-                if (accumulated + segLen >= dist) {
-                    var t:Number = (dist - accumulated) / segLen;
-                    px = Number(vx[s]) + (Number(vx[s + 1]) - Number(vx[s])) * t;
-                    py = Number(vy[s]) + (Number(vy[s + 1]) - Number(vy[s])) * t;
-                    break;
-                }
-                accumulated += segLen;
-            }
-
-            var chaseCol:uint = UIPrimitives.COL_AMBER;
-            if (currentThreat == 2) chaseCol = UIPrimitives.COL_WARN;
-
-            // Bright dot
-            g.beginFill(0xFFFFFF, 0.95);
-            g.drawCircle(px, py, 1.5);
-            g.endFill();
-            g.beginFill(chaseCol, 0.70);
-            g.drawCircle(px, py, 3);
-            g.endFill();
-
-            // Trail
-            for (var trail:int = 1; trail <= 4; trail++) {
-                var trailPos:Number = (chasePos - trail * 0.008);
-                if (trailPos < 0) trailPos += 1.0;
-                var trailDist:Number = trailPos * totalLen;
-                var ta:Number = 0;
-                var tpx:Number = Number(vx[0]);
-                var tpy:Number = Number(vy[0]);
-
-                for (s = 0; s < numSegs; s++) {
-                    segLen = Number(segLens[s]);
-                    if (ta + segLen >= trailDist) {
-                        t = (trailDist - ta) / segLen;
-                        tpx = Number(vx[s]) + (Number(vx[s + 1]) - Number(vx[s])) * t;
-                        tpy = Number(vy[s]) + (Number(vy[s + 1]) - Number(vy[s])) * t;
-                        break;
-                    }
-                    ta += segLen;
-                }
-
-                var trailAlpha:Number = 0.5 * (1 - trail / 5);
-                g.beginFill(chaseCol, trailAlpha);
-                g.drawCircle(tpx, tpy, 2 - trail * 0.3);
-                g.endFill();
-            }
-
-            chaseContainer.filters = [new GlowFilter(chaseCol, 0.55, 8, 8, 2, 1)];
-        }
-
         // ================================================================
         // BUILD UI
         // ================================================================
         private function buildUI():void {
-            // === CYBER PANEL (all structural layers) ===
-            cyberParts = UIPrimitives.buildCyberPanel(this, PANEL_W, PANEL_H,
-                UIPrimitives.COL_AMBER, "full", true, "", "WPN-01");
-            panelShape = cyberParts.panel as Shape;
-            headerParts = cyberParts.header;
+            // === TOP COORDINATES (above panel, cyberpunk style) ===
+            var coordL:TextField = UIPrimitives.makeDataTag(this,
+                "56.34  65.45", 7, UIPrimitives.COL_FRAME, 0.25);
+            coordL.x = 6;
+            coordL.y = -12;
 
-            var hdrY:Number = Number(cyberParts.headerY);
-            var contentY:Number = Number(cyberParts.contentY);
+            var crossX:TextField = UIPrimitives.makeDataTag(this,
+                "X", 7, UIPrimitives.COL_FRAME, 0.30);
+            crossX.x = PANEL_W * 0.5 - 4;
+            crossX.y = -12;
 
-            // Weapon name ON the header band (bold, white, centered in 26px)
-            weaponField = UIPrimitives.makeValue(this, "--", 14, 0.97, 0xFFFFFF);
-            weaponField.x = PAD + 2;
-            weaponField.y = hdrY + 4;
+            var coordR:TextField = UIPrimitives.makeDataTag(this,
+                "56.34  65.45", 7, UIPrimitives.COL_FRAME, 0.25);
+            coordR.x = PANEL_W - 80;
+            coordR.y = -12;
+
+            // === PANEL BACKGROUND ===
+            panelBg = new Shape();
+            var pg:* = panelBg.graphics;
+            pg.beginFill(UIPrimitives.COL_BG, 0.85);
+            pg.drawRect(0, 0, PANEL_W, PANEL_H);
+            pg.endFill();
+            pg.lineStyle(1, UIPrimitives.COL_BORDER, 0.40);
+            pg.drawRect(0, 0, PANEL_W, PANEL_H);
+            addChild(panelBg);
+
+            // Corner brackets
+            UIPrimitives.drawCornerBrackets(this, PANEL_W, PANEL_H, 8,
+                UIPrimitives.COL_ACCENT, 0.35);
+
+            // === HEADER ZONE (weapon name + threat badge) ===
+            weaponField = UIPrimitives.makeValue(this, "--", 12, 0.95, 0xFFFFFF);
+            weaponField.x = PAD;
+            weaponField.y = 5;
             weaponField.width = PANEL_W - 100;
 
-            // Threat indicator (on header band, right side, centered)
+            // Threat status badge (right side of header)
+            threatBadge = UIPrimitives.drawStatusBadge(this, "CLEAR",
+                PANEL_W - 70, 6, UIPrimitives.COL_BORDER, 0.60);
+
+            // Header divider
+            UIPrimitives.drawDivider(this, PAD, 28, PANEL_W - PAD, 28, 0.25);
+
+            // === MAIN ZONE (large ammo + reserve) ===
+            ammoField = UIPrimitives.makeValue(this, "--- / ---", 18, 0.95,
+                0xFFFFFF);
+            ammoField.x = PAD;
+            ammoField.y = 34;
+            ammoField.width = 180;
+
+            magLabel = UIPrimitives.makeLabel(this, "MAG", 8, 0.45,
+                UIPrimitives.COL_TEXT_SEC);
+            magLabel.x = PAD;
+            magLabel.y = 60;
+
+            reserveField = UIPrimitives.makeValue(this, "---", 14, 0.70,
+                UIPrimitives.COL_TEXT_SEC);
+            reserveField.x = PANEL_W - 80;
+            reserveField.y = 38;
+            reserveField.width = 70;
+            var rfmt:TextFormat = reserveField.defaultTextFormat;
+            rfmt.align = TextFormatAlign.RIGHT;
+            reserveField.defaultTextFormat = rfmt;
+            reserveField.setTextFormat(rfmt);
+
+            reserveLabel = UIPrimitives.makeLabel(this, "RESERVE", 8, 0.35,
+                UIPrimitives.COL_FRAME);
+            reserveLabel.x = PANEL_W - 66;
+            reserveLabel.y = 60;
+
+            // Main/bottom divider
+            UIPrimitives.drawDivider(this, PAD, 78, PANEL_W - PAD, 78, 0.20);
+
+            // === BOTTOM ZONE (ammo type + hostiles) ===
+            ammoTypeField = UIPrimitives.makeLabel(this, "--", 9, 0.55,
+                UIPrimitives.COL_TEXT_SEC);
+            ammoTypeField.x = PAD;
+            ammoTypeField.y = 82;
+            ammoTypeField.width = 180;
+
+            // Threat dot (breathing glow in combat)
             threatDot = new Shape();
-            threatDot.graphics.beginFill(UIPrimitives.COL_AMBER, 0.95);
-            threatDot.graphics.drawCircle(0, 0, 5);
+            threatDot.graphics.beginFill(UIPrimitives.COL_BORDER, 0.60);
+            threatDot.graphics.drawCircle(0, 0, 3);
             threatDot.graphics.endFill();
-            threatDot.x = PANEL_W - 58;
-            threatDot.y = hdrY + UIPrimitives.HEADER_BAND_H / 2;
+            threatDot.x = PANEL_W - 70;
+            threatDot.y = 90;
             addChild(threatDot);
-            UIPrimitives.applyNeonGlow(threatDot, UIPrimitives.COL_AMBER, 0.4);
 
-            threatField = UIPrimitives.makeLabel(this, "CLEAR", 11, 0.90, 0xFFFFFF);
-            threatField.x = PANEL_W - 50;
-            threatField.y = hdrY + 6;
-
-            // === AMMO READOUT (large, readable) ===
-            ammoField = UIPrimitives.makeValue(this, "--- / ---", 22, 0.95,
-                UIPrimitives.COL_AMBER);
-            ammoField.x = PAD + 6;
-            ammoField.y = contentY + 6;
-            ammoField.width = PANEL_W - PAD * 2;
-
-            // === BOTTOM ROW: ammo type + alert icon + hostile count ===
-            bottomRowY = contentY + 40;
-
-            ammoTypeField = UIPrimitives.makeLabel(this, "--", 10);
-            ammoTypeField.x = PAD + 6;
-            ammoTypeField.y = bottomRowY;
-            ammoTypeField.width = 200;
-
-            // Alert icon (speaker) for hostile count
+            // Alert icon
             alertIcon = UIPrimitives.drawAlertIcon(this,
-                PANEL_W - 52, bottomRowY + 7, 10,
-                UIPrimitives.COL_AMBER, 0.70);
+                PANEL_W - 52, 90, 10, UIPrimitives.COL_BORDER, 0.50);
 
-            hostileField = UIPrimitives.makeLabel(this, "", 10);
-            hostileField.x = PANEL_W - 40;
-            hostileField.y = bottomRowY;
+            // Hostile count
+            hostileField = UIPrimitives.makeLabel(this, "\u00D70", 10, 0.55,
+                UIPrimitives.COL_TEXT_SEC);
+            hostileField.x = PANEL_W - 38;
+            hostileField.y = 82;
             hostileField.width = 30;
 
-            // Chase light container (on top of everything)
-            chaseContainer = new Sprite();
-            addChild(chaseContainer);
+            // Bottom divider
+            UIPrimitives.drawDivider(this, PAD, 102, PANEL_W - PAD, 102, 0.15);
+
+            // Scanning status text (animated dots)
+            scanField = UIPrimitives.makeLabel(this, "SCANNING", 7, 0.30,
+                UIPrimitives.COL_FRAME);
+            scanField.width = PANEL_W;
+            var sfmt:TextFormat = scanField.defaultTextFormat;
+            sfmt.align = TextFormatAlign.CENTER;
+            sfmt.letterSpacing = 2;
+            scanField.defaultTextFormat = sfmt;
+            scanField.setTextFormat(sfmt);
+            scanField.x = 0;
+            scanField.y = 108;
+
+            // Data tag below panel
+            var tag:TextField = UIPrimitives.makeDataTag(this, "WPN-01", 8,
+                UIPrimitives.COL_FRAME_LIGHT, 0.30);
+            tag.x = PANEL_W * 0.5 - 20;
+            tag.y = PANEL_H + 1;
         }
 
         private function showPlaceholder():void {
@@ -241,28 +202,80 @@ package loreout.widgets {
         }
 
         // ================================================================
-        // UPDATE NUMERIC DATA (simplified — no MAG/RES labels)
+        // ENTER_FRAME
         // ================================================================
-        private function updateNumericData(magCur:int, magCap:int, reserve:int,
-                                            spareMags:int, threat:int, hostiles:int):void {
-            // Single ammo readout: "030 / 030    383"
-            if (magCap > 0) {
-                ammoField.text = padNum(magCur, 3) + " / " + padNum(magCap, 3) + "    " + String(reserve);
+        private function onFrame(e:Event):void {
+            frameCount++;
+
+            // Smooth ammo transitions
+            displayMag += (targetMag - displayMag) * 0.25;
+            displayReserve += (targetReserve - displayReserve) * 0.25;
+
+            // Threat dot breathing glow
+            if (currentThreat > 0) {
+                var dotCol:uint = (currentThreat == 2) ?
+                    UIPrimitives.COL_WARN : UIPrimitives.COL_ACCENT;
+                var glowA:Number = 0.3 + Math.sin(frameCount * 0.07) * 0.2;
+                threatDot.filters = [
+                    new GlowFilter(dotCol, glowA, 4, 4, 1.5, 1)];
             } else {
-                ammoField.text = "--- / ---";
+                threatDot.filters = [];
             }
 
-            // Ammo field color based on mag level
-            var magPct:Number = (magCap > 0) ? (magCur / magCap) : 0;
-            var ammoCol:uint = UIPrimitives.COL_AMBER;
-            if (magPct < 0.15) ammoCol = UIPrimitives.COL_WARN;
-            else if (magPct < 0.35) ammoCol = UIPrimitives.COL_AMBER;
+            // Scanning dots animation (cycle every 20 frames)
+            if (frameCount % 20 == 0) {
+                scanPhase = (scanPhase + 1) % 4;
+            }
+            var dots:String;
+            switch (scanPhase) {
+                case 0: dots = ". SCANNING ."; break;
+                case 1: dots = ". . SCANNING . ."; break;
+                case 2: dots = ". . . SCANNING . . ."; break;
+                default: dots = ". . SCANNING . ."; break;
+            }
+            scanField.text = dots;
+
+            updateAmmoDisplay();
+        }
+
+        // ================================================================
+        // UPDATE AMMO DISPLAY (smooth values)
+        // ================================================================
+        private function updateAmmoDisplay():void {
+            var showMag:int = int(Math.round(displayMag));
+            var showRes:int = int(Math.round(displayReserve));
+
+            if (magCap > 0) {
+                ammoField.text = padNum(showMag, 3) + " / " +
+                    padNum(magCap, 3);
+                reserveField.text = String(showRes);
+            } else {
+                ammoField.text = "--- / ---";
+                reserveField.text = "---";
+            }
+
+            // Color: red if mag < 15%
+            var magPct:Number = (magCap > 0) ? (displayMag / magCap) : 1;
+            var ammoCol:uint = (magPct < 0.15) ?
+                UIPrimitives.COL_WARN : UIPrimitives.COL_ACCENT;
+
             var afmt:TextFormat = ammoField.defaultTextFormat;
             afmt.color = ammoCol;
             ammoField.defaultTextFormat = afmt;
             ammoField.setTextFormat(afmt);
+        }
 
-            // Hostile count with alert icon
+        // ================================================================
+        // UPDATE NUMERIC DATA
+        // ================================================================
+        private function updateNumericData(magCur:int, cap:int, reserve:int,
+            spareMags:int, threat:int, hostiles:int):void {
+
+            targetMag = magCur;
+            magCap = cap;
+            targetReserve = reserve;
+
+            // Hostile count
             if (hostiles > 0) {
                 hostileField.text = "\u00D7" + hostiles;
                 var hfmt:TextFormat = hostileField.defaultTextFormat;
@@ -270,7 +283,7 @@ package loreout.widgets {
                 hostileField.defaultTextFormat = hfmt;
                 hostileField.setTextFormat(hfmt);
             } else {
-                hostileField.text = "\u00D7" + "0";
+                hostileField.text = "\u00D70";
                 var hfmt2:TextFormat = hostileField.defaultTextFormat;
                 hfmt2.color = UIPrimitives.COL_TEXT_SEC;
                 hostileField.defaultTextFormat = hfmt2;
@@ -295,7 +308,7 @@ package loreout.widgets {
         }
 
         // ================================================================
-        // UPDATE THREAT VISUAL — recolor tactical panel + header + dot
+        // UPDATE THREAT VISUAL
         // ================================================================
         private function updateThreatVisual():void {
             var col:uint;
@@ -306,37 +319,35 @@ package loreout.widgets {
                     label = "DANGER";
                     break;
                 case 1:
-                    col = UIPrimitives.COL_AMBER;
+                    col = UIPrimitives.COL_ACCENT;
                     label = "CAUTION";
                     break;
                 default:
-                    col = UIPrimitives.COL_AMBER;
+                    col = UIPrimitives.COL_BORDER;
                     label = "CLEAR";
                     break;
             }
 
-            // Recolor cyber panel (grey frame stays, accent trim + header shift)
-            var headerAlpha:Number = (currentThreat == 2) ? 0.65 :
-                (currentThreat == 1) ? 0.55 : 0.55;
-            UIPrimitives.recolorCyberPanel(cyberParts, col, headerAlpha);
+            // Rebuild threat badge
+            if (threatBadge && threatBadge.parent) {
+                threatBadge.parent.removeChild(threatBadge);
+            }
+            threatBadge = UIPrimitives.drawStatusBadge(this, label,
+                PANEL_W - 70, 6, col,
+                (currentThreat == 2) ? 0.90 : 0.60);
 
-            // Threat dot — glow on the dot (5px radius)
+            // Threat dot
             threatDot.graphics.clear();
-            threatDot.graphics.beginFill(col, 0.95);
-            threatDot.graphics.drawCircle(0, 0, 5);
+            threatDot.graphics.beginFill(col, 0.85);
+            threatDot.graphics.drawCircle(0, 0, 3);
             threatDot.graphics.endFill();
-            UIPrimitives.applyNeonGlow(threatDot, col, (currentThreat == 2) ? 1.0 : 0.4);
-
-            threatField.text = label;
-            var tfmt:TextFormat = threatField.defaultTextFormat;
-            tfmt.color = (currentThreat > 0) ? col : 0xFFFFFF;
-            threatField.defaultTextFormat = tfmt;
-            threatField.setTextFormat(tfmt);
 
             // Recolor alert icon
-            if (alertIcon && alertIcon.parent) alertIcon.parent.removeChild(alertIcon);
+            if (alertIcon && alertIcon.parent) {
+                alertIcon.parent.removeChild(alertIcon);
+            }
             alertIcon = UIPrimitives.drawAlertIcon(this,
-                PANEL_W - 52, bottomRowY + 7, 10, col, 0.70);
+                PANEL_W - 52, 90, 10, col, 0.50);
         }
 
         // ================================================================
@@ -345,8 +356,9 @@ package loreout.widgets {
         public function processMessage(command:String, params:Array):void {
             var cmd:int = parseInt(command);
             if (cmd == CMD_COMBAT_UPDATE && params && params.length >= 6) {
-                updateNumericData(int(params[0]), int(params[1]), int(params[2]),
-                    int(params[3]), int(params[4]), int(params[5]));
+                updateNumericData(int(params[0]), int(params[1]),
+                    int(params[2]), int(params[3]),
+                    int(params[4]), int(params[5]));
             } else if (cmd == CMD_WEAPON_NAME && params && params.length >= 1) {
                 updateWeaponName(String(params[0]));
             } else if (cmd == CMD_AMMO_TYPE && params && params.length >= 1) {

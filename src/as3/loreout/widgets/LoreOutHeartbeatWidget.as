@@ -11,11 +11,15 @@ package loreout.widgets {
     import loreout.ui.UIPrimitives;
 
     /**
-     * LoreOut Heartbeat Widget v11 — Tactical panel ECG module.
+     * LoreOut Heartbeat Widget v12 — Vitals Monitor.
      *
-     * 192x56 with chamfered tactical panel, left chevron header,
-     * tactical brackets, glowing heart icon, dotted baseline,
-     * ECG trace with glow. Panel outline shifts: teal→amber→red.
+     * 300x80 panel with medical monitor aesthetic:
+     *   - Heart icon + "VITALS" header + HP% readout
+     *   - Grid-paper background behind ECG trace
+     *   - PQRST beat pattern with scrolling waveform
+     *   - BPM counter (bottom-right)
+     *
+     * White (healthy), grey (medium), red (critical).
      *
      * CMD 300 (floats): hpPercent, radPercent, isHealing, isTakingDmg
      */
@@ -24,7 +28,7 @@ package loreout.widgets {
         private static const CMD_HEARTBEAT:int = 300;
 
         private static const PANEL_W:int = 300;
-        private static const PANEL_H:int = 70;
+        private static const PANEL_H:int = 80;
         private static const PAD:int = 6;
 
         // ECG
@@ -32,16 +36,13 @@ package loreout.widgets {
         private static const SCROLL_SPEED:Number = 1.5;
         private static const BEAT_LEN:int = 40;
 
-        // Cyber panel assembly
-        private var cyberParts:Object;
-        private var panelShape:Shape;
-        private var headerParts:Object;
+        // Elements
+        private var panelBg:Shape;
         private var heartIcon:Shape;
-        private var baselineDots:Shape;
-
-        // Content
+        private var gridBg:Shape;
         private var traceContainer:Sprite;
         private var hpValue:TextField;
+        private var bpmField:TextField;
 
         // State
         private var hpPercent:Number = 100;
@@ -108,56 +109,80 @@ package loreout.widgets {
         // BUILD UI
         // ================================================================
         private function buildUI():void {
-            // === CYBER PANEL (all structural layers) ===
-            cyberParts = UIPrimitives.buildCyberPanel(this, PANEL_W, PANEL_H,
-                UIPrimitives.COL_ACCENT, "medium", true, "", "VIT-01");
-            panelShape = cyberParts.panel as Shape;
-            headerParts = cyberParts.header;
+            // Panel background (dark rect + border)
+            panelBg = new Shape();
+            var pg:* = panelBg.graphics;
+            pg.beginFill(UIPrimitives.COL_BG, 0.85);
+            pg.drawRect(0, 0, PANEL_W, PANEL_H);
+            pg.endFill();
+            pg.lineStyle(1, UIPrimitives.COL_BORDER, 0.40);
+            pg.drawRect(0, 0, PANEL_W, PANEL_H);
+            addChild(panelBg);
 
-            var hdrY:Number = Number(cyberParts.headerY);
-            var contentY:Number = Number(cyberParts.contentY);
+            // Corner brackets
+            UIPrimitives.drawCornerBrackets(this, PANEL_W, PANEL_H, 8,
+                UIPrimitives.COL_ACCENT, 0.35);
 
-            // Heart icon on header band — GLOWS (centered in 26px)
-            heartIcon = UIPrimitives.drawHeartIcon(this, 14, hdrY + 13, 10, 0xFFFFFF, 0.85);
-            UIPrimitives.applyNeonGlow(heartIcon, UIPrimitives.COL_ACCENT, 0.3);
+            // Heart icon (white)
+            heartIcon = UIPrimitives.drawHeartIcon(this,
+                14, 13, 10, 0xFFFFFF, 0.85);
 
-            // "VITALS" label on header band (centered in 26px)
-            var headerLabel:TextField = UIPrimitives.makeValue(this, "VITALS", 11, 0.95, 0xFFFFFF);
+            // "VITALS" label
+            var headerLabel:TextField = UIPrimitives.makeValue(this,
+                "VITALS", 11, 0.90, 0xFFFFFF);
             headerLabel.x = 24;
-            headerLabel.y = hdrY + 5;
+            headerLabel.y = 4;
 
-            // HP percentage on header band (right side, centered in 26px)
-            hpValue = UIPrimitives.makeValue(this, "100%", 13, 0.97, 0xFFFFFF);
+            // HP percentage (right-aligned)
+            hpValue = UIPrimitives.makeValue(this, "100%", 13, 0.97,
+                0xFFFFFF);
             hpValue.x = PANEL_W - 54;
-            hpValue.y = hdrY + 3;
+            hpValue.y = 2;
             hpValue.width = 48;
             var hfmt:TextFormat = hpValue.defaultTextFormat;
             hfmt.align = TextFormatAlign.RIGHT;
             hpValue.defaultTextFormat = hfmt;
             hpValue.setTextFormat(hfmt);
 
+            // Header divider
+            UIPrimitives.drawDivider(this, PAD, 22, PANEL_W - PAD, 22, 0.25);
+
             // Trace area dimensions
-            traceY = contentY + 2;
-            traceH = PANEL_H - contentY - 10;
+            traceY = 24;
+            traceH = PANEL_H - traceY - 18;
             traceW = PANEL_W - PAD * 2;
 
-            // Dotted baseline at center of trace
-            baselineDots = new Shape();
-            var baseY:Number = traceY + traceH * 0.5;
-            var dg:* = baselineDots.graphics;
-            dg.lineStyle(0);
-            for (var i:int = 0; i < int(traceW / 4); i++) {
-                dg.beginFill(UIPrimitives.COL_BORDER, 0.25);
-                dg.drawCircle(PAD + i * 4 + 1, baseY, 0.7);
-                dg.endFill();
-            }
-            addChild(baselineDots);
+            // Grid-paper background (faint vertical lines + center line)
+            gridBg = UIPrimitives.drawGridPattern(this,
+                PAD, traceY, traceW, traceH,
+                24, 0, UIPrimitives.COL_FRAME, 0.06);
 
             // ECG trace container
             traceContainer = new Sprite();
             traceContainer.x = PAD;
             traceContainer.y = traceY;
             addChild(traceContainer);
+
+            // Bottom divider
+            UIPrimitives.drawDivider(this, PAD, traceY + traceH + 2,
+                PANEL_W - PAD, traceY + traceH + 2, 0.15);
+
+            // BPM counter (bottom-right)
+            bpmField = UIPrimitives.makeLabel(this, "72 BPM", 9, 0.50,
+                UIPrimitives.COL_TEXT_SEC);
+            bpmField.x = PANEL_W - 60;
+            bpmField.y = PANEL_H - 16;
+            bpmField.width = 54;
+            var bfmt:TextFormat = bpmField.defaultTextFormat;
+            bfmt.align = TextFormatAlign.RIGHT;
+            bpmField.defaultTextFormat = bfmt;
+            bpmField.setTextFormat(bfmt);
+
+            // Data tag below panel
+            var tag:TextField = UIPrimitives.makeDataTag(this, "VIT-01", 8,
+                UIPrimitives.COL_FRAME_LIGHT, 0.30);
+            tag.x = 20;
+            tag.y = PANEL_H + 1;
         }
 
         // ================================================================
@@ -166,6 +191,7 @@ package loreout.widgets {
         private function onFrame(e:Event):void {
             frameCount++;
 
+            // Beat interval scales with HP
             if (hpPercent > 75) beatInterval = 80;
             else if (hpPercent > 50) beatInterval = 55;
             else if (hpPercent > 25) beatInterval = 35;
@@ -181,7 +207,7 @@ package loreout.widgets {
 
             var sample:Number = 0.5;
             if (hpPercent <= 0) {
-                sample = 0.5;
+                sample = 0.5; // flatline
             } else if (isBeatActive) {
                 sample = Number(beatPattern[beatPhase]);
                 var amplitude:Number = 0.4 + (hpPercent / 100) * 0.6;
@@ -193,8 +219,10 @@ package loreout.widgets {
                 }
             }
 
+            // Radiation noise
             if (radPercent > 10) {
-                sample += (Math.random() - 0.5) * (radPercent / 100) * 0.08;
+                sample += (Math.random() - 0.5) *
+                    (radPercent / 100) * 0.08;
             }
 
             waveBuffer[writePos] = sample;
@@ -211,6 +239,7 @@ package loreout.widgets {
             var g:* = traceContainer.graphics;
             g.clear();
 
+            // Trace color based on HP
             var traceColor:uint;
             var traceAlpha:Number = 0.90;
             if (hpPercent <= 0) {
@@ -225,7 +254,9 @@ package loreout.widgets {
             }
 
             if (isHealing && hpPercent > 0) traceAlpha = 0.95;
-            if (isTakingDmg && hpPercent > 0) traceColor = UIPrimitives.COL_WARN;
+            if (isTakingDmg && hpPercent > 0) {
+                traceColor = UIPrimitives.COL_WARN;
+            }
 
             g.lineStyle(2, traceColor, traceAlpha);
 
@@ -235,23 +266,28 @@ package loreout.widgets {
             for (var i:int = 0; i < TRACE_SAMPLES; i++) {
                 var idx:int = (readPos + i) % TRACE_SAMPLES;
                 var val:Number = Number(waveBuffer[idx]);
-                var py:Number = (1.0 - val) * traceH - traceH * 0.5 + traceH * 0.5;
+                var py:Number = (1.0 - val) * traceH;
                 var px:Number = i * stepX;
                 if (i == 0) g.moveTo(px, py);
                 else g.lineTo(px, py);
             }
 
-            // Trace glow (on the trace, not the panel)
-            traceContainer.filters = [new GlowFilter(traceColor, 0.40, 4, 4, 1.2, 1)];
+            // Trace glow (red only in danger)
+            if (traceColor == UIPrimitives.COL_WARN) {
+                traceContainer.filters = [
+                    new GlowFilter(traceColor, 0.40, 4, 4, 1.2, 1)];
+            } else {
+                traceContainer.filters = [];
+            }
 
-            // Recolor cyber panel (grey frame stays, accent trim + header shift)
-            var hdrAlpha:Number = (hpPercent < 25) ? 0.65 :
-                (hpPercent < 50) ? 0.55 : 0.55;
-            UIPrimitives.recolorCyberPanel(cyberParts, traceColor, hdrAlpha);
-
-            // Recolor heart icon glow to match
-            UIPrimitives.applyNeonGlow(heartIcon, traceColor,
-                (hpPercent < 25) ? 0.5 : 0.3);
+            // Heart icon glow (red only in danger)
+            if (hpPercent < 25) {
+                heartIcon.filters = [
+                    new GlowFilter(UIPrimitives.COL_WARN, 0.5, 4, 4,
+                        1.5, 1)];
+            } else {
+                heartIcon.filters = [];
+            }
 
             // HP readout
             hpValue.text = int(hpPercent) + "%";
@@ -260,13 +296,23 @@ package loreout.widgets {
             vfmt.align = TextFormatAlign.RIGHT;
             hpValue.defaultTextFormat = vfmt;
             hpValue.setTextFormat(vfmt);
+
+            // BPM counter (assumes ~30fps)
+            var bpm:int = Math.round(60 * 30 / beatInterval);
+            bpmField.text = bpm + " BPM";
+            var bfmt:TextFormat = bpmField.defaultTextFormat;
+            bfmt.color = (hpPercent < 25) ?
+                UIPrimitives.COL_WARN : UIPrimitives.COL_TEXT_SEC;
+            bfmt.align = TextFormatAlign.RIGHT;
+            bpmField.defaultTextFormat = bfmt;
+            bpmField.setTextFormat(bfmt);
         }
 
         // ================================================================
         // UPDATE HP DATA
         // ================================================================
         private function updateHealth(hp:Number, rad:Number,
-                                       healing:Boolean, damage:Boolean):void {
+            healing:Boolean, damage:Boolean):void {
             hpPercent = hp;
             radPercent = rad;
             isHealing = healing;
