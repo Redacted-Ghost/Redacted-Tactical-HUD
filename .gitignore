@@ -16,6 +16,7 @@ Thumbs.db
 # IDE / Editor
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~
@@ -31,3 +32,10 @@ __pycache__/
 # Temp
 *.tmp
 *.bak
+tmp/
+
+# Reference art (large, not deliverable)
+Art/
+
+# Windows artifacts
+nul
