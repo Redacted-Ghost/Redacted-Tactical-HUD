@@ -1,28 +1,37 @@
 Scriptname LoreOutStatus_QuestScript extends Quest
-{ LoreOut Status Widget controller.
-  Eye icon + cycling status messages based on stealth/combat state.
-  Uses GhostHUD-grade lifecycle: delayed init, retry, OnPlayerLoadGame.
-  OnCombatStateChanged provides instant threat updates. }
+{ Redacted Tactical HUD — Status Widget controller.
+  Animated eye icon + cycling awareness messages + weather/time/location.
+  Sends LIVE threat/detection/hostile data via Lighthouse.
 
-; Log name — writes to Logs/Script/User/LoreOutStatus.0.log
+  CMD 100 (float): threat, hostileCount, isDetected
+  CMD 101 (string): time + weather (e.g. "7:58 PM CLEAR")
+  CMD 102 (string): location name
+  Eye states: 0=CLOSED (calm), 1=SCANNING (sneak), 2=OPEN (combat) }
+
+; Log name
 String LOG_NAME = "LoreOutStatus" Const
 
-; Command ID — matches AS3 CMD_STATUS_UPDATE
-Int Property CMD_STATUS_UPDATE = 201 Auto Const
+; Command IDs — match AS3 constants
+Int Property CMD_STATUS_UPDATE = 100 Auto Const
+Int Property CMD_WEATHER_TIME = 101 Auto Const
+Int Property CMD_LOCATION = 102 Auto Const
 
-; Widget SWF filename (in Interface/)
+; Widget SWF filename
 String Property WIDGET_FILE = "LoreOutStatusWidget.swf" Auto Const
 
 ; Timer IDs
 Int TIMER_REGISTER = 0 Const
 Int TIMER_UPDATE = 1 Const
+Int TIMER_WEATHER = 2 Const
 
-; Position: directly above combat widget (1104, 616 - 28 - 4 = 584)
-Float Property WIDGET_X = 1104.0 Auto Const
-Float Property WIDGET_Y = 584.0 Auto Const
+; Position: right-side stack top. v11: 300x54 → (964, 540)
+; Status(540)+54=594, 8px gap → Combat at 602
+Float Property WIDGET_X = 964.0 Auto Const
+Float Property WIDGET_Y = 540.0 Auto Const
 
-; Background poll interval
+; Poll intervals
 Float POLL_INTERVAL = 0.5 Const
+Float WEATHER_INTERVAL = 5.0 Const
 
 ; State
 HUDFramework hud
@@ -49,7 +58,7 @@ Event Actor.OnPlayerLoadGame(Actor akSender)
     StartTimer(4.0, TIMER_REGISTER)
 EndEvent
 
-; Instant threat update on combat state change
+; Instant update on combat state change (no poll delay)
 Event Actor.OnCombatStateChanged(Actor akSender, Actor akTarget, int aeCombatState)
     if bLoaded
         Debug.TraceUser(LOG_NAME, "Combat state changed: " + aeCombatState)
@@ -63,6 +72,9 @@ Event OnTimer(Int aiTimerID)
     elseif aiTimerID == TIMER_UPDATE
         SendStatusData()
         StartTimer(POLL_INTERVAL, TIMER_UPDATE)
+    elseif aiTimerID == TIMER_WEATHER
+        SendWeatherData()
+        StartTimer(WEATHER_INTERVAL, TIMER_WEATHER)
     endif
 EndEvent
 
@@ -98,17 +110,16 @@ Function HUD_WidgetLoaded(String asWidgetID)
     bLoaded = true
     Debug.TraceUser(LOG_NAME, "Widget loaded: " + asWidgetID)
 
-    ; Send initial state
     SendStatusData()
+    SendWeatherData()
 
-    ; Start background poll for sneak state (no event for sneak enter/exit)
     StartTimer(POLL_INTERVAL, TIMER_UPDATE)
-    Debug.TraceUser(LOG_NAME, "Status update loop started (" + POLL_INTERVAL + "s)")
+    StartTimer(WEATHER_INTERVAL, TIMER_WEATHER)
+    Debug.TraceUser(LOG_NAME, "Status + weather loops started")
 EndFunction
 
 ; === DATA ===
-; CMD_STATUS_UPDATE (201): threat state
-;   param[0] = threat (0=CALM, 1=STEALTH, 2=COMBAT)
+; CMD 100: threat(0/1/2), hostileCount, isDetected(0/1)
 
 Function SendStatusData()
     if !hud || !bLoaded
@@ -117,13 +128,92 @@ Function SendStatusData()
 
     Actor player = Game.GetPlayer()
 
-    ; Threat state — REAL data from player state
-    Float threat = 0.0
+    ; === Threat state ===
+    float threat = 0.0
     if player.IsInCombat()
         threat = 2.0
     elseif player.IsSneaking()
         threat = 1.0
     endif
 
-    hud.SendMessage(WIDGET_FILE, CMD_STATUS_UPDATE, threat, 0.0, 0.0, 0.0, 0.0, 0.0)
+    ; === Hostile count (Lighthouse — bool check first for perf) ===
+    float hostileCount = 0.0
+    if Lighthouse.AreHostileActorsInRange(player, 3000)
+        Actor[] hostiles = Lighthouse.GetActorsHostileToActor(player, 3000, false)
+        if hostiles
+            hostileCount = hostiles.Length
+        endif
+    endif
+
+    ; === Detection state (Lighthouse) ===
+    float isDetected = 0.0
+    if Lighthouse.IsPlayerDetectedByHostile()
+        isDetected = 1.0
+    endif
+
+    hud.SendMessage(WIDGET_FILE, CMD_STATUS_UPDATE, threat, hostileCount, isDetected, 0.0, 0.0, 0.0)
+EndFunction
+
+; CMD 101: time + weather string
+; CMD 102: location name string
+
+Function SendWeatherData()
+    if !hud || !bLoaded
+        return
+    endif
+
+    ; === Game time ===
+    float gameTime = Utility.GetCurrentGameTime()
+    float dayFraction = gameTime - Math.Floor(gameTime)
+    int totalMinutes = (dayFraction * 1440) as Int
+    int hours24 = totalMinutes / 60
+    int minutes = totalMinutes % 60
+
+    ; Convert to 12hr format
+    String ampm = "AM"
+    int hours12 = hours24
+    if hours24 >= 12
+        ampm = "PM"
+        if hours24 > 12
+            hours12 = hours24 - 12
+        endif
+    endif
+    if hours12 == 0
+        hours12 = 12
+    endif
+
+    String minStr = minutes as String
+    if minutes < 10
+        minStr = "0" + minStr
+    endif
+    String timeStr = hours12 + ":" + minStr + " " + ampm
+
+    ; === Weather ===
+    Weather currentWeather = Weather.GetCurrentWeather()
+    String weatherStr = "CLEAR"
+    if currentWeather
+        ; Use classification flags to determine weather type
+        int classFlags = currentWeather.GetClassification()
+        ; 0=Pleasant, 1=Cloudy, 2=Rainy, 3=Snow
+        if classFlags == 3
+            weatherStr = "SNOW"
+        elseif classFlags == 2
+            weatherStr = "RAIN"
+        elseif classFlags == 1
+            weatherStr = "CLOUDY"
+        else
+            weatherStr = "CLEAR"
+        endif
+    endif
+
+    hud.SendMessageString(WIDGET_FILE, CMD_WEATHER_TIME as String, timeStr + "  " + weatherStr, true, false)
+
+    ; === Location ===
+    Location playerLoc = Game.GetPlayer().GetCurrentLocation()
+    if playerLoc
+        String locName = playerLoc.GetName()
+        if locName != ""
+            hud.SendMessageString(WIDGET_FILE, CMD_LOCATION as String, locName, true, false)
+        endif
+    endif
 EndFunction
