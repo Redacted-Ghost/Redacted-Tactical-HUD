@@ -897,8 +897,8 @@ package loreout.ui {
             g.lineTo(c, 0);
             g.endFill();
 
-            // -- L2: Outer accent frame (2px, separate edges — no joins) --
-            g.lineStyle(2, accent, 0.30);
+            // -- L2: Outer structural frame (2px grey, separate edges — no joins) --
+            g.lineStyle(2, COL_FRAME_LIGHT, 0.50);
             g.moveTo(c, 0);    g.lineTo(wi, 0);         // top
             g.moveTo(wi, 0);   g.lineTo(wi, hi - c2);   // right
             g.moveTo(wi, hi - c2); g.lineTo(wi - c2, hi);// BR chamfer
