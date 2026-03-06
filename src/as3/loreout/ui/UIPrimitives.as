@@ -48,6 +48,10 @@ package loreout.ui {
         public static const COL_FRAME:uint    = 0x334455;   // structural frame lines
         public static const COL_FRAME_LIGHT:uint = 0x8899AA; // light grey for panel borders
 
+        // V9: uniform panel color + vitals accent
+        public static const COL_COMBAT_GREY:uint  = 0x789170; // grey-green military (all panels)
+        public static const COL_VITALS_GREEN:uint = 0x1EDC32; // Fallout bright green (vitals glow)
+
         // ---- LINE WEIGHT TIERS (3-tier hierarchy) ----
         public static const W_PRIMARY:Number   = 3;    // header bars, main spines
         public static const W_SECONDARY:Number = 2;    // dividers, frames

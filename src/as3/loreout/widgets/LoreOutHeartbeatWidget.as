@@ -110,7 +110,7 @@ package loreout.widgets {
         private function buildUI():void {
             // === CYBER PANEL (all structural layers) ===
             cyberParts = UIPrimitives.buildCyberPanel(this, PANEL_W, PANEL_H,
-                UIPrimitives.COL_ACCENT, "medium", true, "", "VIT-01");
+                UIPrimitives.COL_COMBAT_GREY, "medium", true, "", "VIT-01");
             panelShape = cyberParts.panel as Shape;
             headerParts = cyberParts.header;
 
@@ -119,7 +119,7 @@ package loreout.widgets {
 
             // Heart icon on header band — GLOWS (centered in 26px)
             heartIcon = UIPrimitives.drawHeartIcon(this, 14, hdrY + 13, 10, 0xFFFFFF, 0.85);
-            UIPrimitives.applyNeonGlow(heartIcon, UIPrimitives.COL_ACCENT, 0.3);
+            UIPrimitives.applyNeonGlow(heartIcon, UIPrimitives.COL_VITALS_GREEN, 0.4);
 
             // "VITALS" label on header band (centered in 26px)
             var headerLabel:TextField = UIPrimitives.makeValue(this, "VITALS", 11, 0.95, 0xFFFFFF);
@@ -221,7 +221,7 @@ package loreout.widgets {
             } else if (hpPercent < 50) {
                 traceColor = UIPrimitives.COL_AMBER;
             } else {
-                traceColor = UIPrimitives.COL_ACCENT;
+                traceColor = UIPrimitives.COL_VITALS_GREEN;
             }
 
             if (isHealing && hpPercent > 0) traceAlpha = 0.95;
@@ -242,24 +242,21 @@ package loreout.widgets {
             }
 
             // Trace glow (on the trace, not the panel)
-            traceContainer.filters = [new GlowFilter(traceColor, 0.40, 4, 4, 1.2, 1)];
+            traceContainer.filters = [new GlowFilter(traceColor, 0.55, 6, 6, 1.5, 1)];
 
-            // Recolor cyber panel (grey frame stays, accent trim + header shift)
-            var hdrAlpha:Number = (hpPercent < 25) ? 0.65 :
-                (hpPercent < 50) ? 0.55 : 0.55;
-            UIPrimitives.recolorCyberPanel(cyberParts, traceColor, hdrAlpha);
-
-            // Recolor heart icon glow to match
+            // V9: Panel stays grey-green always. Only elements glow with state color.
+            // Recolor heart icon glow to match state
             UIPrimitives.applyNeonGlow(heartIcon, traceColor,
-                (hpPercent < 25) ? 0.5 : 0.3);
+                (hpPercent < 25) ? 0.7 : 0.4);
 
-            // HP readout
+            // HP readout — glows with state color
             hpValue.text = int(hpPercent) + "%";
             var vfmt:TextFormat = hpValue.defaultTextFormat;
-            vfmt.color = (hpPercent < 50) ? traceColor : 0xFFFFFF;
+            vfmt.color = traceColor;
             vfmt.align = TextFormatAlign.RIGHT;
             hpValue.defaultTextFormat = vfmt;
             hpValue.setTextFormat(vfmt);
+            hpValue.filters = [new GlowFilter(traceColor, 0.4, 4, 4, 1.2, 1)];
         }
 
         // ================================================================

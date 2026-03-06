@@ -18,10 +18,10 @@ String Property WIDGET_FILE = "LoreOutHeartbeatWidget.swf" Auto Const
 Int TIMER_REGISTER = 0 Const
 Int TIMER_UPDATE = 1 Const
 
-; Position: left-side stack middle. v11: 300x70 → (16, 524)
-; Vitals(524)+70=594, 8px gap → Rads at 602
+; Position: V9 left stack bottom. 300x70 → (16, 642)
+; Vitals at bottom-left. 642+70=712, 8px from screen bottom
 Float Property WIDGET_X = 16.0 Auto Const
-Float Property WIDGET_Y = 524.0 Auto Const
+Float Property WIDGET_Y = 642.0 Auto Const
 
 ; Poll interval (faster for responsive ECG)
 Float POLL_INTERVAL = 0.25 Const

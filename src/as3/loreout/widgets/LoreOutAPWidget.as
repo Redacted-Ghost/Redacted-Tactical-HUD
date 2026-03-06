@@ -65,7 +65,7 @@ package loreout.widgets {
         private function buildUI():void {
             // === CYBER PANEL (slim, minimal structural) ===
             cyberParts = UIPrimitives.buildCyberPanel(this, PANEL_W, PANEL_H,
-                UIPrimitives.COL_BLUE, "slim");
+                UIPrimitives.COL_COMBAT_GREY, "slim");
             panelShape = cyberParts.panel as Shape;
 
             // Bolt icon (left, inside panel) — GLOWS
@@ -163,9 +163,9 @@ package loreout.widgets {
             vfmt.align = TextFormatAlign.RIGHT;
             apValue.defaultTextFormat = vfmt;
             apValue.setTextFormat(vfmt);
+            apValue.filters = [new GlowFilter(col, 0.4, 4, 4, 1.2, 1)];
 
-            // Recolor cyber panel (grey frame stays, accent trim shifts)
-            UIPrimitives.recolorCyberPanel(cyberParts, col);
+            // V9: Panel stays grey-green always. Only elements glow with state color.
 
             // Recolor bolt icon glow to match
             UIPrimitives.applyNeonGlow(boltIcon, col, 0.25);

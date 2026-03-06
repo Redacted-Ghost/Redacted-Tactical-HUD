@@ -133,8 +133,9 @@ package loreout.widgets {
                 accumulated += segLen;
             }
 
-            var chaseCol:uint = UIPrimitives.COL_AMBER;
+            var chaseCol:uint = UIPrimitives.COL_COMBAT_GREY;
             if (currentThreat == 2) chaseCol = UIPrimitives.COL_WARN;
+            else if (currentThreat == 1) chaseCol = UIPrimitives.COL_AMBER;
 
             // Bright dot
             g.beginFill(0xFFFFFF, 0.95);
@@ -179,7 +180,7 @@ package loreout.widgets {
         private function buildUI():void {
             // === CYBER PANEL (all structural layers) ===
             cyberParts = UIPrimitives.buildCyberPanel(this, PANEL_W, PANEL_H,
-                UIPrimitives.COL_AMBER, "full", true, "", "WPN-01");
+                UIPrimitives.COL_COMBAT_GREY, "full", true, "", "WPN-01");
             panelShape = cyberParts.panel as Shape;
             headerParts = cyberParts.header;
 
@@ -194,13 +195,13 @@ package loreout.widgets {
 
             // Threat indicator (on header band, right side, centered)
             threatDot = new Shape();
-            threatDot.graphics.beginFill(UIPrimitives.COL_AMBER, 0.95);
+            threatDot.graphics.beginFill(UIPrimitives.COL_COMBAT_GREY, 0.95);
             threatDot.graphics.drawCircle(0, 0, 5);
             threatDot.graphics.endFill();
             threatDot.x = PANEL_W - 58;
             threatDot.y = hdrY + UIPrimitives.HEADER_BAND_H / 2;
             addChild(threatDot);
-            UIPrimitives.applyNeonGlow(threatDot, UIPrimitives.COL_AMBER, 0.4);
+            UIPrimitives.applyNeonGlow(threatDot, UIPrimitives.COL_COMBAT_GREY, 0.4);
 
             threatField = UIPrimitives.makeLabel(this, "CLEAR", 11, 0.90, 0xFFFFFF);
             threatField.x = PANEL_W - 50;
@@ -208,7 +209,7 @@ package loreout.widgets {
 
             // === AMMO READOUT (large, readable) ===
             ammoField = UIPrimitives.makeValue(this, "--- / ---", 22, 0.95,
-                UIPrimitives.COL_AMBER);
+                UIPrimitives.COL_COMBAT_GREY);
             ammoField.x = PAD + 6;
             ammoField.y = contentY + 6;
             ammoField.width = PANEL_W - PAD * 2;
@@ -224,7 +225,7 @@ package loreout.widgets {
             // Alert icon (speaker) for hostile count
             alertIcon = UIPrimitives.drawAlertIcon(this,
                 PANEL_W - 52, bottomRowY + 7, 10,
-                UIPrimitives.COL_AMBER, 0.70);
+                UIPrimitives.COL_COMBAT_GREY, 0.70);
 
             hostileField = UIPrimitives.makeLabel(this, "", 10);
             hostileField.x = PANEL_W - 40;
@@ -254,13 +255,15 @@ package loreout.widgets {
 
             // Ammo field color based on mag level
             var magPct:Number = (magCap > 0) ? (magCur / magCap) : 0;
-            var ammoCol:uint = UIPrimitives.COL_AMBER;
+            var ammoCol:uint = UIPrimitives.COL_COMBAT_GREY;
             if (magPct < 0.15) ammoCol = UIPrimitives.COL_WARN;
             else if (magPct < 0.35) ammoCol = UIPrimitives.COL_AMBER;
             var afmt:TextFormat = ammoField.defaultTextFormat;
             afmt.color = ammoCol;
             ammoField.defaultTextFormat = afmt;
             ammoField.setTextFormat(afmt);
+            ammoField.filters = (magPct < 0.35 && magCap > 0) ?
+                [new GlowFilter(ammoCol, 0.5, 4, 4, 1.2, 1)] : [];
 
             // Hostile count with alert icon
             if (hostiles > 0) {
@@ -310,30 +313,30 @@ package loreout.widgets {
                     label = "CAUTION";
                     break;
                 default:
-                    col = UIPrimitives.COL_AMBER;
+                    col = UIPrimitives.COL_COMBAT_GREY;
                     label = "CLEAR";
                     break;
             }
 
-            // Recolor cyber panel (grey frame stays, accent trim + header shift)
-            var headerAlpha:Number = (currentThreat == 2) ? 0.65 :
-                (currentThreat == 1) ? 0.55 : 0.55;
-            UIPrimitives.recolorCyberPanel(cyberParts, col, headerAlpha);
+            // V9: Panel stays grey-green always. Only elements glow with state color.
 
-            // Threat dot — glow on the dot (5px radius)
+            // Threat dot — glows with state color
             threatDot.graphics.clear();
             threatDot.graphics.beginFill(col, 0.95);
             threatDot.graphics.drawCircle(0, 0, 5);
             threatDot.graphics.endFill();
             UIPrimitives.applyNeonGlow(threatDot, col, (currentThreat == 2) ? 1.0 : 0.4);
 
+            // Threat label — glows with state color
             threatField.text = label;
             var tfmt:TextFormat = threatField.defaultTextFormat;
             tfmt.color = (currentThreat > 0) ? col : 0xFFFFFF;
             threatField.defaultTextFormat = tfmt;
             threatField.setTextFormat(tfmt);
+            threatField.filters = (currentThreat > 0) ?
+                [new GlowFilter(col, 0.5, 4, 4, 1.2, 1)] : [];
 
-            // Recolor alert icon
+            // Alert icon — glows with state color
             if (alertIcon && alertIcon.parent) alertIcon.parent.removeChild(alertIcon);
             alertIcon = UIPrimitives.drawAlertIcon(this,
                 PANEL_W - 52, bottomRowY + 7, 10, col, 0.70);

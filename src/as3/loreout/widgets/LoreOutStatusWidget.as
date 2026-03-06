@@ -105,7 +105,7 @@ package loreout.widgets {
         private function buildUI():void {
             // === CYBER PANEL (no header — eye is focal point) ===
             cyberParts = UIPrimitives.buildCyberPanel(this, PANEL_W, PANEL_H,
-                UIPrimitives.COL_AMBER, "medium", false, "", "SRV-01");
+                UIPrimitives.COL_COMBAT_GREY, "medium", false, "", "SRV-01");
             panelShape = cyberParts.panel as Shape;
 
             // Divider between text rows (inside content area, 1px bold)
@@ -444,14 +444,16 @@ package loreout.widgets {
                     break;
             }
 
-            // Recolor cyber panel (grey frame stays, accent trim shifts)
-            UIPrimitives.recolorCyberPanel(cyberParts, eyeColor);
+            // V9: Panel stays grey-green always. Only elements glow with state color.
 
-            // Update text colors
+            // Update text colors — glowing with state color
             statusText.textColor = eyeColor;
             var tfmt:TextFormat = statusText.defaultTextFormat;
             tfmt.color = eyeColor;
             statusText.defaultTextFormat = tfmt;
+            statusText.filters = (threat > 0) ?
+                [new GlowFilter(eyeColor, 0.5, 4, 4, 1.2, 1)] :
+                [UIPrimitives.TEXT_SHADOW];
 
             // Eye glow
             if (threat > 0) {

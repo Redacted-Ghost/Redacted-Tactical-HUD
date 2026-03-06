@@ -21,7 +21,8 @@ $widgets = @(
     @("loreout\widgets\LoreOutHeartbeatWidget.as", "LoreOutHeartbeatWidget.swf"),
     @("loreout\widgets\LoreOutCompassWidget.as", "LoreOutCompassWidget.swf"),
     @("loreout\widgets\LoreOutRadsWidget.as", "LoreOutRadsWidget.swf"),
-    @("loreout\widgets\LoreOutAPWidget.as", "LoreOutAPWidget.swf")
+    @("loreout\widgets\LoreOutAPWidget.as", "LoreOutAPWidget.swf"),
+    @("loreout\widgets\LoreOutWeatherWidget.as", "LoreOutWeatherWidget.swf")
 )
 
 Write-Host "=== Building LoreOut Widgets ===" -ForegroundColor Cyan

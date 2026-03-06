@@ -115,6 +115,13 @@ quests = [
         'script_name':  'LoreOutAP_QuestScript',
         'priority':     50,
     },
+    {
+        'form_id':     0x01000009,
+        'editor_id':   'LoreOutWeather_Quest',
+        'display_name': 'Redacted Tactical HUD - Weather',
+        'script_name':  'LoreOutWeather_QuestScript',
+        'priority':     50,
+    },
 ]
 
 # --- TES4 (file header) ---

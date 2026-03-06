@@ -83,7 +83,7 @@ package loreout.widgets {
         private function buildUI():void {
             // === CYBER PANEL (all structural layers) ===
             cyberParts = UIPrimitives.buildCyberPanel(this, PANEL_W, PANEL_H,
-                UIPrimitives.COL_ACCENT, "full", true, "RADIATION", "RAD-01");
+                UIPrimitives.COL_COMBAT_GREY, "full", true, "RADIATION", "RAD-01");
             panelShape = cyberParts.panel as Shape;
             headerParts = cyberParts.header;
 
@@ -400,9 +400,7 @@ package loreout.widgets {
         private function updateReadout(pct:Number):void {
             var col:uint = getRadColor(pct);
 
-            // Recolor cyber panel (grey frame stays, accent trim + header shift)
-            var hdrAlpha:Number = (pct > 0.75) ? 0.65 : 0.55;
-            UIPrimitives.recolorCyberPanel(cyberParts, col, hdrAlpha);
+            // V9: Panel stays grey-green always. Only elements glow with state color.
 
             // Recolor trefoil icon glow
             UIPrimitives.applyNeonGlow(radIconSp, col, (pct > 0.5) ? 0.5 : 0.3);
@@ -417,6 +415,8 @@ package loreout.widgets {
             vfmt.align = TextFormatAlign.CENTER;
             radValue.defaultTextFormat = vfmt;
             radValue.setTextFormat(vfmt);
+            radValue.filters = (pct > 0.15) ?
+                [new GlowFilter(col, 0.5, 4, 4, 1.2, 1)] : [];
 
             var lfmt:TextFormat = radLabel.defaultTextFormat;
             lfmt.color = col;
