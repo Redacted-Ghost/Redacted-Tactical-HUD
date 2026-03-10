@@ -52,6 +52,19 @@ package loreout.ui {
         public static const COL_COMBAT_GREY:uint  = 0x789170; // grey-green military (all panels)
         public static const COL_VITALS_GREEN:uint = 0x1EDC32; // Fallout bright green (vitals glow)
 
+        // ---- V11 DESATURATED PALETTE (locked) ----
+        public static const COL_V11_GREEN:uint     = 0x00D938;  // vitals/safe/nominal
+        public static const COL_V11_ECG:uint       = 0x1ABC2A;  // ECG trace green
+        public static const COL_V11_AMBER:uint     = 0xD98000;  // caution/radiation/zone
+        public static const COL_V11_RED:uint       = 0xC43030;  // danger/critical/combat
+        public static const COL_V11_BLUE:uint      = 0x008FD9;  // AP/energy/info
+        public static const COL_V11_WHITE:uint     = 0xE0E0E0;  // default text/labels
+        public static const COL_V11_BG:uint        = 0x080A0C;  // background
+        public static const COL_V11_PANEL_HI:uint  = 0x0A0F14;  // panel gradient top
+        public static const COL_V11_PANEL_LO:uint  = 0x050709;  // panel gradient bottom
+        public static const COL_V11_BORDER:uint    = 0x1A2129;  // panel borders
+        public static const COL_V11_BADGE:uint     = 0x050709;  // dark badge fill
+
         // ---- LINE WEIGHT TIERS (3-tier hierarchy) ----
         public static const W_PRIMARY:Number   = 3;    // header bars, main spines
         public static const W_SECONDARY:Number = 2;    // dividers, frames
@@ -1518,6 +1531,945 @@ package loreout.ui {
                 }
             }
             parent.addChild(s); return s;
+        }
+
+        // ================================================================
+        //  V11 ASSET SHEET — NEW PRIMITIVES
+        //  From Figma Make "Dark Background Asset Sheet" (9 sections)
+        // ================================================================
+
+        // ================================================================
+        // TREFOIL ICON: Radiation hazard symbol (3-blade propeller)
+        // Three fat wedge blades at 120° intervals, small center hub.
+        // ================================================================
+        public static function drawTrefoilIcon(
+            parent:DisplayObjectContainer,
+            cx:Number, cy:Number,
+            size:Number,
+            color:uint,
+            alpha:Number = 0.85):Shape {
+
+            var s:Shape = new Shape();
+            var g:* = s.graphics;
+            var r:Number = size * 0.5;
+            var hubR:Number = r * 0.18;
+            var bladeInner:Number = r * 0.22;
+            var bladeOuter:Number = r * 0.92;
+            var bladeHalf:Number = Math.PI / 7;  // half-width of each blade in radians
+            var i:int;
+            var angle:Number;
+
+            // --- Pass 1: Fill blades (no lineStyle) ---
+            for (i = 0; i < 3; i++) {
+                angle = (i * 2 * Math.PI / 3) - Math.PI * 0.5; // start at top
+                var a1:Number = angle - bladeHalf;
+                var a2:Number = angle + bladeHalf;
+
+                g.beginFill(color, alpha);
+                g.moveTo(cx + Math.cos(a1) * bladeInner, cy + Math.sin(a1) * bladeInner);
+                // outer arc approximated with line segments
+                var arcSteps:int = 8;
+                for (var as1:int = 0; as1 <= arcSteps; as1++) {
+                    var t:Number = a1 + (a2 - a1) * (as1 / arcSteps);
+                    g.lineTo(cx + Math.cos(t) * bladeOuter, cy + Math.sin(t) * bladeOuter);
+                }
+                g.lineTo(cx + Math.cos(a2) * bladeInner, cy + Math.sin(a2) * bladeInner);
+                // inner arc back
+                for (var as2:int = arcSteps; as2 >= 0; as2--) {
+                    var t2:Number = a1 + (a2 - a1) * (as2 / arcSteps);
+                    g.lineTo(cx + Math.cos(t2) * bladeInner, cy + Math.sin(t2) * bladeInner);
+                }
+                g.endFill();
+            }
+
+            // --- Pass 2: Center hub fill ---
+            g.beginFill(color, alpha);
+            g.drawCircle(cx, cy, hubR);
+            g.endFill();
+
+            // --- Pass 3: Center hub ring stroke ---
+            g.lineStyle(1, color, alpha * 0.6);
+            var ringSteps:int = 24;
+            for (var ri:int = 0; ri <= ringSteps; ri++) {
+                var ra:Number = (ri / ringSteps) * Math.PI * 2;
+                var rx:Number = cx + Math.cos(ra) * (hubR + 2);
+                var ry:Number = cy + Math.sin(ra) * (hubR + 2);
+                if (ri == 0) g.moveTo(rx, ry); else g.lineTo(rx, ry);
+            }
+
+            parent.addChild(s);
+            return s;
+        }
+
+        // ================================================================
+        // SKULL ICON: Tactical skull for high-level enemy markers
+        // Geometric angular design — not cartoonish.
+        // ================================================================
+        public static function drawSkullIcon(
+            parent:DisplayObjectContainer,
+            cx:Number, cy:Number,
+            size:Number,
+            color:uint,
+            alpha:Number = 0.85):Shape {
+
+            var s:Shape = new Shape();
+            var g:* = s.graphics;
+            var h2:Number = size * 0.5;
+            var w2:Number = size * 0.42;
+
+            // --- Pass 1: Cranium fill ---
+            g.beginFill(color, alpha);
+            // Top dome (simplified oval using lines)
+            g.moveTo(cx - w2, cy - h2 * 0.1);
+            g.lineTo(cx - w2 * 0.85, cy - h2 * 0.55);
+            g.lineTo(cx - w2 * 0.5, cy - h2 * 0.85);
+            g.lineTo(cx, cy - h2);
+            g.lineTo(cx + w2 * 0.5, cy - h2 * 0.85);
+            g.lineTo(cx + w2 * 0.85, cy - h2 * 0.55);
+            g.lineTo(cx + w2, cy - h2 * 0.1);
+            // Cheekbones
+            g.lineTo(cx + w2 * 0.9, cy + h2 * 0.15);
+            // Jaw notch right
+            g.lineTo(cx + w2 * 0.55, cy + h2 * 0.35);
+            g.lineTo(cx + w2 * 0.55, cy + h2 * 0.65);
+            // Teeth bottom
+            g.lineTo(cx + w2 * 0.35, cy + h2 * 0.65);
+            g.lineTo(cx + w2 * 0.35, cy + h2 * 0.5);
+            g.lineTo(cx + w2 * 0.12, cy + h2 * 0.5);
+            g.lineTo(cx + w2 * 0.12, cy + h2 * 0.65);
+            g.lineTo(cx - w2 * 0.12, cy + h2 * 0.65);
+            g.lineTo(cx - w2 * 0.12, cy + h2 * 0.5);
+            g.lineTo(cx - w2 * 0.35, cy + h2 * 0.5);
+            g.lineTo(cx - w2 * 0.35, cy + h2 * 0.65);
+            // Jaw notch left
+            g.lineTo(cx - w2 * 0.55, cy + h2 * 0.65);
+            g.lineTo(cx - w2 * 0.55, cy + h2 * 0.35);
+            g.lineTo(cx - w2 * 0.9, cy + h2 * 0.15);
+            g.lineTo(cx - w2, cy - h2 * 0.1);
+            g.endFill();
+
+            // --- Pass 2: Eye sockets (cut-outs, dark fill) ---
+            g.beginFill(COL_V11_BG, 0.95);
+            // Left eye — angular trapezoid
+            g.moveTo(cx - w2 * 0.6, cy - h2 * 0.35);
+            g.lineTo(cx - w2 * 0.15, cy - h2 * 0.35);
+            g.lineTo(cx - w2 * 0.2, cy - h2 * 0.05);
+            g.lineTo(cx - w2 * 0.55, cy - h2 * 0.05);
+            g.lineTo(cx - w2 * 0.6, cy - h2 * 0.35);
+            g.endFill();
+
+            g.beginFill(COL_V11_BG, 0.95);
+            // Right eye — angular trapezoid (mirrored)
+            g.moveTo(cx + w2 * 0.15, cy - h2 * 0.35);
+            g.lineTo(cx + w2 * 0.6, cy - h2 * 0.35);
+            g.lineTo(cx + w2 * 0.55, cy - h2 * 0.05);
+            g.lineTo(cx + w2 * 0.2, cy - h2 * 0.05);
+            g.lineTo(cx + w2 * 0.15, cy - h2 * 0.35);
+            g.endFill();
+
+            // --- Pass 3: Nose cavity ---
+            g.beginFill(COL_V11_BG, 0.95);
+            g.moveTo(cx, cy + h2 * 0.05);
+            g.lineTo(cx + w2 * 0.12, cy + h2 * 0.25);
+            g.lineTo(cx - w2 * 0.12, cy + h2 * 0.25);
+            g.lineTo(cx, cy + h2 * 0.05);
+            g.endFill();
+
+            parent.addChild(s);
+            return s;
+        }
+
+        // ================================================================
+        // STAR ICON: 5-point star for legendary enemy markers
+        // ================================================================
+        public static function drawStarIcon(
+            parent:DisplayObjectContainer,
+            cx:Number, cy:Number,
+            size:Number,
+            color:uint,
+            alpha:Number = 0.85):Shape {
+
+            var s:Shape = new Shape();
+            var g:* = s.graphics;
+            var outerR:Number = size * 0.5;
+            var innerR:Number = outerR * 0.38;
+            var points:int = 5;
+
+            // --- Pass 1: Fill ---
+            g.beginFill(color, alpha);
+            for (var i:int = 0; i < points * 2; i++) {
+                var angle:Number = (i * Math.PI / points) - Math.PI * 0.5;
+                var r:Number = (i % 2 == 0) ? outerR : innerR;
+                var px:Number = cx + Math.cos(angle) * r;
+                var py:Number = cy + Math.sin(angle) * r;
+                if (i == 0) g.moveTo(px, py);
+                else g.lineTo(px, py);
+            }
+            g.endFill();
+
+            // --- Pass 2: Outline stroke (separate edges) ---
+            g.lineStyle(1, color, alpha * 0.5);
+            for (var j:int = 0; j < points * 2; j++) {
+                var a1s:Number = (j * Math.PI / points) - Math.PI * 0.5;
+                var a2s:Number = ((j + 1) * Math.PI / points) - Math.PI * 0.5;
+                var r1:Number = (j % 2 == 0) ? outerR : innerR;
+                var r2:Number = ((j + 1) % 2 == 0) ? outerR : innerR;
+                g.moveTo(cx + Math.cos(a1s) * r1, cy + Math.sin(a1s) * r1);
+                g.lineTo(cx + Math.cos(a2s) * r2, cy + Math.sin(a2s) * r2);
+            }
+
+            parent.addChild(s);
+            return s;
+        }
+
+        // ================================================================
+        // CHECKMARK ICON: Simple tick/check for confirmations
+        // ================================================================
+        public static function drawCheckmarkIcon(
+            parent:DisplayObjectContainer,
+            cx:Number, cy:Number,
+            size:Number,
+            color:uint,
+            alpha:Number = 0.85):Shape {
+
+            var s:Shape = new Shape();
+            var g:* = s.graphics;
+            var h2:Number = size * 0.5;
+
+            g.lineStyle(2, color, alpha);
+            // Short downstroke
+            g.moveTo(cx - h2 * 0.55, cy);
+            g.lineTo(cx - h2 * 0.1, cy + h2 * 0.5);
+            // Long upstroke
+            g.lineTo(cx + h2 * 0.65, cy - h2 * 0.5);
+
+            parent.addChild(s);
+            return s;
+        }
+
+        // ================================================================
+        // MEDICAL CROSS ICON: Plus-shaped cross for vitals/healing
+        // ================================================================
+        public static function drawMedCrossIcon(
+            parent:DisplayObjectContainer,
+            cx:Number, cy:Number,
+            size:Number,
+            color:uint,
+            alpha:Number = 0.85):Shape {
+
+            var s:Shape = new Shape();
+            var g:* = s.graphics;
+            var h2:Number = size * 0.5;
+            var arm:Number = h2 * 0.32; // arm half-width
+
+            // --- Pass 1: Fill (cross shape as polygon) ---
+            g.beginFill(color, alpha);
+            g.moveTo(cx - arm, cy - h2);
+            g.lineTo(cx + arm, cy - h2);
+            g.lineTo(cx + arm, cy - arm);
+            g.lineTo(cx + h2, cy - arm);
+            g.lineTo(cx + h2, cy + arm);
+            g.lineTo(cx + arm, cy + arm);
+            g.lineTo(cx + arm, cy + h2);
+            g.lineTo(cx - arm, cy + h2);
+            g.lineTo(cx - arm, cy + arm);
+            g.lineTo(cx - h2, cy + arm);
+            g.lineTo(cx - h2, cy - arm);
+            g.lineTo(cx - arm, cy - arm);
+            g.lineTo(cx - arm, cy - h2);
+            g.endFill();
+
+            parent.addChild(s);
+            return s;
+        }
+
+        // ================================================================
+        // SONAR RINGS: Expanding detection arcs (stealth indicator)
+        // Semicircular rings emanating from a center point.
+        // ringCount: 1-5 based on detection level
+        // ================================================================
+        public static function drawSonarRings(
+            parent:DisplayObjectContainer,
+            cx:Number, cy:Number,
+            maxRadius:Number,
+            ringCount:int,
+            color:uint,
+            alpha:Number = 0.5):Shape {
+
+            var s:Shape = new Shape();
+            var g:* = s.graphics;
+            var spacing:Number = maxRadius / 6;
+            var arcSteps:int = 16;
+            if (ringCount < 1) ringCount = 1;
+            if (ringCount > 5) ringCount = 5;
+
+            for (var r:int = 1; r <= ringCount; r++) {
+                var ringR:Number = spacing * (r + 0.5);
+                var ringAlpha:Number = alpha * (1.0 - (r - 1) * 0.15);
+                g.lineStyle(1, color, ringAlpha);
+                // Draw upper semicircle (180°)
+                for (var as3:int = 0; as3 <= arcSteps; as3++) {
+                    var a:Number = Math.PI + (as3 / arcSteps) * Math.PI; // 180° to 360°
+                    var ax:Number = cx + Math.cos(a) * ringR;
+                    var ay:Number = cy + Math.sin(a) * ringR;
+                    if (as3 == 0) g.moveTo(ax, ay); else g.lineTo(ax, ay);
+                }
+            }
+
+            parent.addChild(s);
+            return s;
+        }
+
+        // ================================================================
+        // RAD GAUGE: 180° bottom-half arc meter (CDV-700 style)
+        // Three severity zone segments with radial ticks and needle.
+        // pct: 0.0-1.0 needle position
+        // ================================================================
+        public static function drawRadGauge(
+            parent:DisplayObjectContainer,
+            cx:Number, cy:Number,
+            radius:Number,
+            pct:Number,
+            alpha:Number = 0.80):Shape {
+
+            var s:Shape = new Shape();
+            var g:* = s.graphics;
+            if (pct > 1) pct = 1;
+            if (pct < 0) pct = 0;
+
+            var startA:Number = Math.PI;       // left (180°)
+            var endA:Number = Math.PI * 2;     // right (360°)
+            var arcSteps:int = 24;
+            var thick:Number = radius * 0.18;
+            var innerR:Number = radius - thick;
+
+            // --- Pass 1: Green zone (0-33%) ---
+            _drawArcZone(g, cx, cy, radius, innerR, startA,
+                startA + (endA - startA) * 0.33, arcSteps, COL_V11_GREEN, alpha * 0.7);
+
+            // --- Pass 2: Amber zone (33-66%) ---
+            _drawArcZone(g, cx, cy, radius, innerR,
+                startA + (endA - startA) * 0.33,
+                startA + (endA - startA) * 0.66, arcSteps, COL_V11_AMBER, alpha * 0.7);
+
+            // --- Pass 3: Red zone (66-100%) ---
+            _drawArcZone(g, cx, cy, radius, innerR,
+                startA + (endA - startA) * 0.66, endA, arcSteps, COL_V11_RED, alpha * 0.7);
+
+            // --- Pass 4: Tick marks (7 ticks) ---
+            var tickCount:int = 7;
+            for (var t:int = 0; t <= tickCount; t++) {
+                var ta:Number = startA + (endA - startA) * (t / tickCount);
+                var isMajor:Boolean = (t % 2 == 0);
+                var tInner:Number = isMajor ? (innerR - 3) : (innerR - 1);
+                var tOuter:Number = radius + (isMajor ? 3 : 1);
+                g.lineStyle(isMajor ? 1.5 : 0.5, COL_V11_WHITE, alpha * 0.6);
+                g.moveTo(cx + Math.cos(ta) * tInner, cy + Math.sin(ta) * tInner);
+                g.lineTo(cx + Math.cos(ta) * tOuter, cy + Math.sin(ta) * tOuter);
+            }
+
+            // --- Pass 5: Needle ---
+            var needleA:Number = startA + (endA - startA) * pct;
+            var needleLen:Number = radius + 2;
+            g.lineStyle(2, COL_V11_WHITE, alpha);
+            g.moveTo(cx, cy);
+            g.lineTo(cx + Math.cos(needleA) * needleLen,
+                     cy + Math.sin(needleA) * needleLen);
+
+            // --- Pass 6: Center pivot dot ---
+            g.lineStyle(0);
+            g.beginFill(COL_V11_WHITE, alpha);
+            g.drawCircle(cx, cy, 2);
+            g.endFill();
+
+            parent.addChild(s);
+            return s;
+        }
+
+        // Internal: draw a filled arc zone segment
+        private static function _drawArcZone(
+            g:*, cx:Number, cy:Number,
+            outerR:Number, innerR:Number,
+            startA:Number, endA:Number,
+            steps:int, color:uint, alpha:Number):void {
+
+            var segSteps:int = int(steps * ((endA - startA) / Math.PI));
+            if (segSteps < 4) segSteps = 4;
+
+            g.beginFill(color, alpha);
+            // Outer arc forward
+            g.moveTo(cx + Math.cos(startA) * outerR, cy + Math.sin(startA) * outerR);
+            for (var o:int = 1; o <= segSteps; o++) {
+                var oa:Number = startA + (endA - startA) * (o / segSteps);
+                g.lineTo(cx + Math.cos(oa) * outerR, cy + Math.sin(oa) * outerR);
+            }
+            // Inner arc backward
+            for (var iv:int = segSteps; iv >= 0; iv--) {
+                var ia:Number = startA + (endA - startA) * (iv / segSteps);
+                g.lineTo(cx + Math.cos(ia) * innerR, cy + Math.sin(ia) * innerR);
+            }
+            g.endFill();
+        }
+
+        // ================================================================
+        // CONDITION BAR: Multi-segment degradation bar (green→amber→red)
+        // Shows weapon/equipment wear. pct: 0.0-1.0
+        // ================================================================
+        public static function drawConditionBar(
+            parent:DisplayObjectContainer,
+            x:Number, y:Number,
+            w:Number, h:Number,
+            pct:Number):Shape {
+
+            var s:Shape = new Shape();
+            var g:* = s.graphics;
+            if (pct > 1) pct = 1;
+            if (pct < 0) pct = 0;
+            var segments:int = 20;
+            var gap:Number = 1;
+            var segW:Number = (w - (segments - 1) * gap) / segments;
+            var filledSegs:int = int(pct * segments);
+
+            for (var i:int = 0; i < segments; i++) {
+                var sx:Number = x + i * (segW + gap);
+                if (i < filledSegs) {
+                    // Color based on position: green → amber → red
+                    var segPct:Number = i / segments;
+                    var c:uint;
+                    if (segPct < 0.5) c = COL_V11_GREEN;
+                    else if (segPct < 0.75) c = COL_V11_AMBER;
+                    else c = COL_V11_RED;
+                    g.beginFill(c, 0.85);
+                } else {
+                    g.beginFill(COL_V11_BORDER, 0.3);
+                }
+                g.drawRect(sx, y, segW, h);
+                g.endFill();
+            }
+
+            parent.addChild(s);
+            return s;
+        }
+
+        // ================================================================
+        // HAZARD STRIPES: Diagonal warning stripe pattern fill
+        // Used in WEAPON DRY and critical notification banners.
+        // ================================================================
+        public static function drawHazardStripes(
+            parent:DisplayObjectContainer,
+            x:Number, y:Number,
+            w:Number, h:Number,
+            color:uint,
+            alpha:Number = 0.3):Shape {
+
+            var s:Shape = new Shape();
+            var g:* = s.graphics;
+            var stripeW:Number = 6;
+            var stripeGap:Number = 8;
+            var totalW:Number = w + h; // extend to cover diagonal
+
+            g.lineStyle(0);
+            for (var sx:Number = -h; sx < totalW; sx += stripeW + stripeGap) {
+                g.beginFill(color, alpha);
+                g.moveTo(x + sx, y + h);
+                g.lineTo(x + sx + stripeW, y + h);
+                g.lineTo(x + sx + stripeW + h, y);
+                g.lineTo(x + sx + h, y);
+                g.lineTo(x + sx, y + h);
+                g.endFill();
+            }
+
+            parent.addChild(s);
+            return s;
+        }
+
+        // ================================================================
+        // AMMO STATUS STRIP: Full-width alert bar with text
+        // status: 0=NOMINAL(green), 1=LOW(amber), 2=DRY(red), 3=LAST MAG(amber)
+        // ================================================================
+        public static function drawAmmoStatusStrip(
+            parent:DisplayObjectContainer,
+            x:Number, y:Number,
+            w:Number, h:Number,
+            status:int):Sprite {
+
+            var sp:Sprite = new Sprite();
+            var g:* = sp.graphics;
+            var color:uint;
+            var text:String;
+
+            switch (status) {
+                case 0: color = COL_V11_GREEN; text = "AMMO NOMINAL"; break;
+                case 1: color = COL_V11_AMBER; text = "AMMUNITION LOW"; break;
+                case 2: color = COL_V11_RED;   text = "WEAPON DRY"; break;
+                case 3: color = COL_V11_AMBER; text = "LAST MAGAZINE"; break;
+                default: color = COL_V11_GREEN; text = "AMMO NOMINAL";
+            }
+
+            // --- Background fill ---
+            g.beginFill(color, 0.15);
+            g.drawRect(x, y, w, h);
+            g.endFill();
+
+            // --- Left accent bar ---
+            g.beginFill(color, 0.8);
+            g.drawRect(x, y, 3, h);
+            g.endFill();
+
+            // --- Border ---
+            g.lineStyle(1, color, 0.4);
+            g.moveTo(x, y); g.lineTo(x + w, y);
+            g.moveTo(x, y + h); g.lineTo(x + w, y + h);
+
+            // --- Hazard stripes for DRY state ---
+            if (status == 2) {
+                drawHazardStripes(sp, x, y, w, h, color, 0.12);
+            }
+
+            // --- Status text ---
+            var tf:TextField = makeLabel(sp, text, 10, 0.95, color);
+            tf.x = x + 10;
+            tf.y = y + (h - 14) * 0.5;
+
+            sp.x = 0;
+            sp.y = 0;
+            parent.addChild(sp);
+            return sp;
+        }
+
+        // ================================================================
+        // FIRE MODE SELECTOR: SAFE / SEMI / BURST / AUTO indicator
+        // activeMode: 0=SAFE, 1=SEMI, 2=BURST, 3=AUTO
+        // ================================================================
+        public static function drawFireModeSelector(
+            parent:DisplayObjectContainer,
+            x:Number, y:Number,
+            activeMode:int,
+            color:uint):Sprite {
+
+            var sp:Sprite = new Sprite();
+            var modes:Array = ["SAFE", "SEMI", "BURST", "AUTO"];
+            var modeX:Number = x;
+
+            for (var i:int = 0; i < modes.length; i++) {
+                var isActive:Boolean = (i == activeMode);
+                var modeAlpha:Number = isActive ? 0.95 : 0.25;
+                var modeColor:uint = isActive ? color : COL_V11_WHITE;
+                var tf:TextField = makeLabel(sp, modes[i], 9, modeAlpha, modeColor);
+                tf.x = modeX;
+                tf.y = y;
+                modeX += tf.textWidth + 16;
+
+                // Separator dot between modes (except after last)
+                if (i < modes.length - 1) {
+                    var dot:Shape = new Shape();
+                    dot.graphics.beginFill(COL_V11_BORDER, 0.4);
+                    dot.graphics.drawCircle(modeX - 8, y + 6, 1.5);
+                    dot.graphics.endFill();
+                    sp.addChild(dot);
+                }
+            }
+
+            parent.addChild(sp);
+            return sp;
+        }
+
+        // ================================================================
+        // NOTIFICATION BANNER: Alert strip with icon slot + text + chevrons
+        // Full-width banner for critical alerts.
+        // iconType: 0=warning, 1=radiation, 2=medical, 3=check, 4=chevron
+        // ================================================================
+        public static function drawNotificationBanner(
+            parent:DisplayObjectContainer,
+            x:Number, y:Number,
+            w:Number, h:Number,
+            text:String,
+            color:uint,
+            iconType:int = 0):Sprite {
+
+            var sp:Sprite = new Sprite();
+            var g:* = sp.graphics;
+
+            // --- Background with hazard stripes for red ---
+            g.beginFill(color, 0.12);
+            g.drawRect(x, y, w, h);
+            g.endFill();
+            if (color == COL_V11_RED) {
+                drawHazardStripes(sp, x, y, w, h, color, 0.08);
+            }
+
+            // --- Border (separate edges — Scaleform safe) ---
+            g.lineStyle(1.5, color, 0.6);
+            g.moveTo(x, y); g.lineTo(x + w, y);
+            g.moveTo(x, y + h); g.lineTo(x + w, y + h);
+            g.lineStyle(2, color, 0.8);
+            g.moveTo(x, y); g.lineTo(x, y + h);
+
+            // --- Icon slot (left side, 28px square) ---
+            var iconCx:Number = x + 20;
+            var iconCy:Number = y + h * 0.5;
+            var iconSize:Number = h * 0.5;
+
+            // Icon badge background
+            g.lineStyle(0);
+            g.beginFill(color, 0.2);
+            g.drawRect(x + 5, y + 4, 30, h - 8);
+            g.endFill();
+            g.lineStyle(1, color, 0.5);
+            g.moveTo(x + 5, y + 4); g.lineTo(x + 35, y + 4);
+            g.moveTo(x + 5, y + h - 4); g.lineTo(x + 35, y + h - 4);
+
+            switch (iconType) {
+                case 0: drawWarningIcon(sp, iconCx, iconCy, iconSize, color, 0.85); break;
+                case 1: drawTrefoilIcon(sp, iconCx, iconCy, iconSize, color, 0.85); break;
+                case 2: drawMedCrossIcon(sp, iconCx, iconCy, iconSize, color, 0.85); break;
+                case 3: drawCheckmarkIcon(sp, iconCx, iconCy, iconSize, color, 0.85); break;
+                case 4: drawChevronArrows(sp, iconCx - 6, iconCy - 4, 3, 5, color, 0.85); break;
+            }
+
+            // --- Text ---
+            var tf:TextField = makeLabel(sp, text, 11, 0.95, color);
+            tf.x = x + 42;
+            tf.y = y + (h - 15) * 0.5;
+
+            // --- Right-side animated chevrons slot ---
+            drawChevronArrows(sp, x + w - 60, y + (h - 8) * 0.5, 4, 8, color, 0.5);
+
+            parent.addChild(sp);
+            return sp;
+        }
+
+        // ================================================================
+        // LEVEL BADGE: "LVL XX" bordered badge for enemy panels
+        // ================================================================
+        public static function drawLevelBadge(
+            parent:DisplayObjectContainer,
+            x:Number, y:Number,
+            level:int,
+            color:uint):Sprite {
+
+            var sp:Sprite = new Sprite();
+            var g:* = sp.graphics;
+            var text:String = "LVL " + level;
+            var padX:Number = 6;
+            var padY:Number = 3;
+            var textH:Number = 12;
+            var textW:Number = text.length * 7; // approximate
+            var bw:Number = textW + padX * 2;
+            var bh:Number = textH + padY * 2;
+
+            // --- Fill ---
+            g.beginFill(color, 0.2);
+            g.drawRect(x, y, bw, bh);
+            g.endFill();
+
+            // --- Border (separate edges) ---
+            g.lineStyle(1, color, 0.7);
+            g.moveTo(x, y); g.lineTo(x + bw, y);
+            g.moveTo(x + bw, y); g.lineTo(x + bw, y + bh);
+            g.moveTo(x + bw, y + bh); g.lineTo(x, y + bh);
+            g.moveTo(x, y + bh); g.lineTo(x, y);
+
+            // --- Text ---
+            var tf:TextField = makeLabel(sp, text, 10, 0.95, color);
+            tf.x = x + padX;
+            tf.y = y + padY - 1;
+
+            parent.addChild(sp);
+            return sp;
+        }
+
+        // ================================================================
+        // CORNER PIECE: Thick filled corner bracket piece
+        // corner: 0=TL, 1=TR, 2=BR, 3=BL
+        // ================================================================
+        public static function drawCornerPiece(
+            parent:DisplayObjectContainer,
+            x:Number, y:Number,
+            size:Number,
+            corner:int,
+            color:uint,
+            alpha:Number = 0.6):Shape {
+
+            var s:Shape = new Shape();
+            var g:* = s.graphics;
+            var thick:Number = 3;
+
+            // --- Fill pass (L-shaped corner as two rects) ---
+            g.beginFill(color, alpha);
+            switch (corner) {
+                case 0: // TL
+                    g.drawRect(x, y, size, thick);
+                    g.drawRect(x, y, thick, size);
+                    break;
+                case 1: // TR
+                    g.drawRect(x + size - size, y, size, thick);
+                    g.drawRect(x + size - thick, y, thick, size);
+                    break;
+                case 2: // BR
+                    g.drawRect(x, y + size - thick, size, thick);
+                    g.drawRect(x + size - thick, y, thick, size);
+                    break;
+                case 3: // BL
+                    g.drawRect(x, y + size - thick, size, thick);
+                    g.drawRect(x, y, thick, size);
+                    break;
+            }
+            g.endFill();
+
+            parent.addChild(s);
+            return s;
+        }
+
+        // ================================================================
+        // GLITCH SEPARATOR: Dashed/dotted decorative line
+        // style: 0=dashed, 1=dotted
+        // ================================================================
+        public static function drawGlitchSeparator(
+            parent:DisplayObjectContainer,
+            x:Number, y:Number,
+            w:Number,
+            color:uint,
+            alpha:Number = 0.3,
+            style:int = 0):Shape {
+
+            var s:Shape = new Shape();
+            var g:* = s.graphics;
+
+            if (style == 0) {
+                // Dashed line
+                var dashW:Number = 6;
+                var gapW:Number = 4;
+                g.lineStyle(0);
+                for (var dx:Number = 0; dx < w; dx += dashW + gapW) {
+                    var dw:Number = Math.min(dashW, w - dx);
+                    g.beginFill(color, alpha);
+                    g.drawRect(x + dx, y, dw, 1);
+                    g.endFill();
+                }
+            } else {
+                // Dotted line
+                var dotSpacing:Number = 4;
+                g.lineStyle(0);
+                for (var dotX:Number = 0; dotX < w; dotX += dotSpacing) {
+                    g.beginFill(color, alpha);
+                    g.drawCircle(x + dotX, y, 1);
+                    g.endFill();
+                }
+            }
+
+            parent.addChild(s);
+            return s;
+        }
+
+        // ================================================================
+        // CHEVRON ARROWS: >>> directional pattern
+        // count: number of > characters, spacing: px between them
+        // ================================================================
+        public static function drawChevronArrows(
+            parent:DisplayObjectContainer,
+            x:Number, y:Number,
+            count:int,
+            spacing:Number,
+            color:uint,
+            alpha:Number = 0.5):Shape {
+
+            var s:Shape = new Shape();
+            var g:* = s.graphics;
+            var chevH:Number = 6;  // half-height of each >
+            var chevW:Number = 4;  // width of each >
+
+            for (var i:int = 0; i < count; i++) {
+                var cx:Number = x + i * (chevW + spacing);
+                var dimAlpha:Number = alpha * (0.5 + 0.5 * (i / Math.max(count - 1, 1)));
+                g.lineStyle(1.5, color, dimAlpha);
+                g.moveTo(cx, y - chevH);
+                g.lineTo(cx + chevW, y);
+                g.lineTo(cx, y + chevH);
+            }
+
+            parent.addChild(s);
+            return s;
+        }
+
+        // ================================================================
+        // TACTICAL EYE: Enhanced eye with variable threat state
+        // state: 0=UNDETECTED, 1=LOW PROFILE, 2=CAUTION,
+        //        3=COMPROMISED, 4=HOSTILE CONTACT, 5=ENGAGED
+        // Iris openness, pupil size, and targeting brackets scale with state.
+        // ================================================================
+        public static function drawTacticalEye(
+            parent:DisplayObjectContainer,
+            cx:Number, cy:Number,
+            size:Number,
+            state:int,
+            color:uint,
+            alpha:Number = 0.85):Sprite {
+
+            var sp:Sprite = new Sprite();
+            var g:* = sp.graphics;
+            var h2:Number = size * 0.5;
+            // Scale iris openness with state (0-5)
+            var openness:Number = 0.3 + (state / 5) * 0.7; // 0.3 to 1.0
+            var pupilSize:Number = h2 * (0.08 + openness * 0.14);
+            var irisR:Number = h2 * (0.18 + openness * 0.12);
+            var eyeH:Number = h2 * openness;
+
+            // --- Pass 1: Eye shape fill ---
+            g.beginFill(color, alpha * 0.12);
+            g.moveTo(cx - h2, cy);
+            g.curveTo(cx - h2 * 0.5, cy - eyeH, cx, cy - eyeH);
+            g.curveTo(cx + h2 * 0.5, cy - eyeH, cx + h2, cy);
+            g.curveTo(cx + h2 * 0.5, cy + eyeH, cx, cy + eyeH);
+            g.curveTo(cx - h2 * 0.5, cy + eyeH, cx - h2, cy);
+            g.endFill();
+
+            // --- Pass 2: Eye outline stroke (separate edges) ---
+            g.lineStyle(1.5, color, alpha);
+            g.moveTo(cx - h2, cy);
+            g.curveTo(cx - h2 * 0.5, cy - eyeH, cx, cy - eyeH);
+            g.curveTo(cx + h2 * 0.5, cy - eyeH, cx + h2, cy);
+            g.lineStyle(1.5, color, alpha);
+            g.moveTo(cx + h2, cy);
+            g.curveTo(cx + h2 * 0.5, cy + eyeH, cx, cy + eyeH);
+            g.curveTo(cx - h2 * 0.5, cy + eyeH, cx - h2, cy);
+
+            // --- Pass 3: Iris ring ---
+            g.lineStyle(1, color, alpha * 0.7);
+            var irisSteps:int = 16;
+            for (var ir:int = 0; ir <= irisSteps; ir++) {
+                var ia:Number = (ir / irisSteps) * Math.PI * 2;
+                var ix:Number = cx + Math.cos(ia) * irisR;
+                var iy:Number = cy + Math.sin(ia) * irisR;
+                if (ir == 0) g.moveTo(ix, iy); else g.lineTo(ix, iy);
+            }
+
+            // --- Pass 4: Pupil (diamond slit) ---
+            g.lineStyle(0);
+            g.beginFill(color, alpha);
+            g.moveTo(cx, cy - pupilSize * 1.8);
+            g.lineTo(cx + pupilSize, cy);
+            g.lineTo(cx, cy + pupilSize * 1.8);
+            g.lineTo(cx - pupilSize, cy);
+            g.lineTo(cx, cy - pupilSize * 1.8);
+            g.endFill();
+
+            // --- Pass 5: Targeting brackets (state >= 2) ---
+            if (state >= 2) {
+                var bSize:Number = h2 * 0.9;
+                var bLen:Number = bSize * 0.3;
+                var bAlpha:Number = alpha * 0.4;
+                g.lineStyle(0.5, color, bAlpha);
+                // TL bracket
+                g.moveTo(cx - bSize, cy - bSize * 0.5 + bLen);
+                g.lineTo(cx - bSize, cy - bSize * 0.5);
+                g.lineTo(cx - bSize + bLen, cy - bSize * 0.5);
+                // TR bracket
+                g.moveTo(cx + bSize - bLen, cy - bSize * 0.5);
+                g.lineTo(cx + bSize, cy - bSize * 0.5);
+                g.lineTo(cx + bSize, cy - bSize * 0.5 + bLen);
+                // BR bracket
+                g.moveTo(cx + bSize, cy + bSize * 0.5 - bLen);
+                g.lineTo(cx + bSize, cy + bSize * 0.5);
+                g.lineTo(cx + bSize - bLen, cy + bSize * 0.5);
+                // BL bracket
+                g.moveTo(cx - bSize + bLen, cy + bSize * 0.5);
+                g.lineTo(cx - bSize, cy + bSize * 0.5);
+                g.lineTo(cx - bSize, cy + bSize * 0.5 - bLen);
+            }
+
+            parent.addChild(sp);
+            return sp;
+        }
+
+        // ================================================================
+        // DARK BADGE: V11-style badge (dark fill, colored text border)
+        // Returns {sprite, textField} for dynamic text updates.
+        // ================================================================
+        public static function drawDarkBadge(
+            parent:DisplayObjectContainer,
+            x:Number, y:Number,
+            text:String,
+            color:uint,
+            alpha:Number = 0.85):Object {
+
+            var result:Object = {};
+            var sp:Sprite = new Sprite();
+            var g:* = sp.graphics;
+            var padX:Number = 5;
+            var padY:Number = 2;
+            var textH:Number = 11;
+            var textW:Number = text.length * 6.5;
+            var bw:Number = textW + padX * 2;
+            var bh:Number = textH + padY * 2;
+
+            // --- Fill ---
+            g.beginFill(COL_V11_BADGE, 0.9);
+            g.drawRect(x, y, bw, bh);
+            g.endFill();
+
+            // --- Border (separate edges) ---
+            g.lineStyle(1, COL_V11_BORDER, 0.7);
+            g.moveTo(x, y); g.lineTo(x + bw, y);
+            g.moveTo(x + bw, y); g.lineTo(x + bw, y + bh);
+            g.moveTo(x + bw, y + bh); g.lineTo(x, y + bh);
+            g.moveTo(x, y + bh); g.lineTo(x, y);
+
+            // --- Colored text ---
+            var tf:TextField = makeLabel(sp, text, 9, alpha, color);
+            tf.x = x + padX;
+            tf.y = y + padY - 1;
+
+            result.sprite = sp;
+            result.textField = tf;
+            parent.addChild(sp);
+            return result;
+        }
+
+        // ================================================================
+        // THREAT BAR: Segmented threat-level bar (enemy panels)
+        // level: 0=none, 1=low, 2=medium, 3=high, 4=extreme
+        // ================================================================
+        public static function drawThreatBar(
+            parent:DisplayObjectContainer,
+            x:Number, y:Number,
+            w:Number, h:Number,
+            level:int):Shape {
+
+            var s:Shape = new Shape();
+            var g:* = s.graphics;
+            var segments:int = 16;
+            var gap:Number = 1;
+            var segW:Number = (w - (segments - 1) * gap) / segments;
+            var fillCount:int;
+            var fillColor:uint;
+
+            switch (level) {
+                case 1: fillCount = 4;  fillColor = COL_V11_GREEN; break;
+                case 2: fillCount = 8;  fillColor = COL_V11_AMBER; break;
+                case 3: fillCount = 12; fillColor = COL_V11_RED;   break;
+                case 4: fillCount = 16; fillColor = COL_V11_RED;   break;
+                default: fillCount = 0; fillColor = COL_V11_BORDER;
+            }
+
+            for (var i:int = 0; i < segments; i++) {
+                var sx:Number = x + i * (segW + gap);
+                if (i < fillCount) {
+                    g.beginFill(fillColor, 0.8);
+                } else {
+                    g.beginFill(COL_V11_BORDER, 0.25);
+                }
+                g.drawRect(sx, y, segW, h);
+                g.endFill();
+            }
+
+            // Hazard stripes overlay for extreme threat
+            if (level == 4) {
+                drawHazardStripes(parent, x, y, w, h, fillColor, 0.15);
+            }
+
+            parent.addChild(s);
+            return s;
         }
     }
 }
