@@ -1,0 +1,8 @@
+# Upward chevron (quest/objective)
+M 0 -40
+L 35 10
+L 20 10
+L 0 -15
+L -20 10
+L -35 10
+L 0 -40
