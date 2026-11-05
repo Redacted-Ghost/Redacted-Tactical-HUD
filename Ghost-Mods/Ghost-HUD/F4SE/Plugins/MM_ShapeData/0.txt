@@ -1,0 +1,2 @@
+# Circle - default dot (enemies, allies)
+C 0 0 40
